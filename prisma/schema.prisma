@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             String    @id @default(cuid())
+  username       String    @unique
+  password       String    // 将使用bcrypt加密
+  isInitialized  Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Bucket {
+  id             String    @id @default(cuid())
+  name           String    @unique
+  region         String
+  secretId       String
+  secretKey      String    // 将加密存储
+  customDomain   String?   // 可选的自定义域名
+  description    String?
+  isDefault      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  files          File[]
+}
+
+model File {
+  id             String    @id @default(cuid())
+  key            String    // COS中的文件key
+  name           String    // 显示名称
+  size           Int       // 文件大小（字节）
+  type           String    // MIME类型
+  bucketId       String
+  bucket         Bucket    @relation(fields: [bucketId], references: [id], onDelete: Cascade)
+  thumbnailUrl   String?   // 缩略图URL
+  metadata       String?   // JSON格式的额外元数据
+  uploadedAt     DateTime  @default(now())
+  
+  @@unique([bucketId, key])
+}
+
+model Settings {
+  id             String    @id @default(cuid())
+  key            String    @unique
+  value          String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+} 
