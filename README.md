@@ -101,6 +101,8 @@ coshub/
 
 ### 安装步骤
 
+#### 开发环境
+
 1. **克隆仓库**
 ```bash
 git clone https://github.com/yourusername/coshub.git
@@ -112,21 +114,40 @@ cd coshub
 pnpm install
 ```
 
-3. **初始化数据库**
-```bash
-pnpm prisma db push
-```
-
-4. **启动开发服务器**
+3. **启动开发服务器**
 ```bash
 pnpm dev
 ```
 
-5. **系统初始化**
-   - 访问 `http://localhost:3000`
+4. **访问应用**
+   - 打开浏览器访问 `http://localhost:3000`
    - 系统会自动跳转到初始化页面
-   - 设置管理员账号和密码
-   - 系统会自动生成必要的配置文件
+   - 按照引导完成初始化设置
+
+#### 生产环境
+
+1. **克隆并安装**
+```bash
+git clone https://github.com/yourusername/coshub.git
+cd coshub
+pnpm install
+```
+
+2. **构建项目**
+```bash
+pnpm build
+```
+
+3. **启动服务**
+```bash
+pnpm start
+```
+
+4. **完成初始化**
+   - 访问 `http://localhost:3000`
+   - 系统自动引导您完成初始化
+
+> 💡 **提示**: 首次访问时，系统会自动创建数据库、生成配置文件并引导您设置管理员账号，整个过程完全在 Web 界面完成，无需手动配置。
 
 ## 🌐 部署指南
 
@@ -274,6 +295,9 @@ A: 在腾讯云 COS 控制台配置 CDN 加速域名后，在存储桶设置中�
 
 ### Q: 数据库可以更换吗？
 A: 可以，修改 `prisma/schema.prisma` 中的 provider，支持 PostgreSQL、MySQL 等。
+
+### Q: 首次启动后提示重启服务器？
+A: 这是正常现象，系统在首次运行时会自动创建环境配置文件，需要重启以加载配置。
 
 ## 🤝 贡献指南
 

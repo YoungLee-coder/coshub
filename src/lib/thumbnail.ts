@@ -1,8 +1,7 @@
 import sharp from 'sharp'
-import { createCosInstance, uploadFile, getFileUrl } from './cos'
-import { CosConfig } from '@/types'
+import { getFileUrl } from './cos'
 import { shouldGenerateThumbnail, isImageFile, isVideoFile } from './utils'
-import { TRAFFIC_CONTROL, getThumbnailParams } from './config'
+import { TRAFFIC_CONTROL } from './config'
 
 const THUMBNAIL_WIDTH = TRAFFIC_CONTROL.thumbnail.maxWidth
 const THUMBNAIL_HEIGHT = TRAFFIC_CONTROL.thumbnail.maxHeight

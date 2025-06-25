@@ -2,12 +2,10 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { FileIcon, ImageIcon, VideoIcon, MoreHorizontal, Download, Trash2, Eye, Upload, Loader2, FolderOpen, Search, X, SlidersHorizontal, Folder, FolderPlus, ChevronRight, Home, Archive, Grid3x3, List, Copy, Link2 } from 'lucide-react'
+import { FileIcon, ImageIcon, VideoIcon, Download, Trash2, Upload, Loader2, FolderOpen, Search, X, SlidersHorizontal, FolderPlus, ChevronRight, Home, Archive, Grid3x3, List } from 'lucide-react'
 import { FileWithUrl } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { ThumbnailViewer } from '@/components/ThumbnailViewer'
@@ -743,47 +741,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   
   const breadcrumbs = getBreadcrumbs()
   
-  // 预取子文件夹数据
-  const prefetchFolder = useCallback(async (folderPath: string) => {
-    await queryClient.prefetchQuery({
-      queryKey: ['files', bucketId, folderPath],
-      queryFn: async () => {
-        const res = await fetch(`/api/files?bucketId=${bucketId}&prefix=${folderPath}`)
-        if (!res.ok) throw new Error('Failed to fetch files')
-        const data = await res.json()
-        
-        // 处理文件和文件夹（同上）
-        const files: FileWithUrl[] = []
-        const folders: FolderItem[] = []
-        const processedPaths = new Set<string>()
-        
-        // API 返回格式是 { files: [], nextMarker: null, isTruncated: false }
-        const responseData = data.files || []
-        responseData.forEach((item: FileWithUrl) => {
-          const relativePath = folderPath ? item.key.slice(folderPath.length) : item.key
-          const parts = relativePath.split('/').filter(Boolean)
-          
-          if (parts.length === 1) {
-            files.push(item)
-          } else if (parts.length > 1) {
-            const folderName = parts[0]
-            const subFolderPath = folderPath ? `${folderPath}${folderName}/` : `${folderName}/`
-            
-            if (!processedPaths.has(subFolderPath)) {
-              processedPaths.add(subFolderPath)
-              folders.push({
-                name: folderName,
-                path: subFolderPath
-              })
-            }
-          }
-        })
-        
-        return { files, folders }
-      },
-      staleTime: 5 * 60 * 1000,
-    })
-  }, [bucketId, queryClient])
+
   
   // 复制文件链接
   const handleCopyLink = (file: FileWithUrl) => {

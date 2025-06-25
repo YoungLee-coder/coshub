@@ -197,7 +197,7 @@ export function setCacheHeaders(headers: Headers, maxAge: number = TRAFFIC_CONTR
 
 // localStorage 缓存管理（用于小数据）
 export const localCache = {
-  set(key: string, value: any, ttl?: number): void {
+  set(key: string, value: unknown, ttl?: number): void {
     const item = {
       value,
       timestamp: Date.now(),

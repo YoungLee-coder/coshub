@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  coshub:
+    build: .
+    container_name: coshub
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/prisma
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=http://localhost:3000
+      - DATABASE_URL=file:./prisma/dev.db
+    restart: unless-stopped 

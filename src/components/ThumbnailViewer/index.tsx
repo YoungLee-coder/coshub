@@ -2,9 +2,8 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Download, ExternalLink, X } from 'lucide-react'
+import { Download, ExternalLink } from 'lucide-react'
 import { FileWithUrl } from '@/types'
-import { isImageFile, getFileExtension, isVideoFile } from '@/lib/utils'
 import { getPreviewParams } from '@/lib/config'
 
 // 工具函数

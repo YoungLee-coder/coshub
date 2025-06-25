@@ -1,108 +1,123 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { getCachedImage, cacheImage, createCachedImageUrl } from '@/lib/cache'
 import { cn } from '@/lib/utils'
-import { Loader2 } from 'lucide-react'
 
-interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+interface CachedImageProps {
   src: string
+  alt: string
+  className?: string
   fallback?: React.ReactNode
-  onCached?: () => void
+  priority?: boolean
 }
 
 export function CachedImage({ 
   src, 
-  fallback, 
-  onCached,
+  alt, 
   className,
-  alt = '',
-  ...props 
+  fallback,
+  priority = false
 }: CachedImageProps) {
-  const [isLoading, setIsLoading] = useState(true)
-  const [cachedUrl, setCachedUrl] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
-  const urlRef = useRef<string | null>(null)
 
   useEffect(() => {
     let mounted = true
-
-    async function loadImage() {
-      if (!src) return
-
+    
+    const loadImage = async () => {
       try {
-        // 先检查缓存
+        setLoading(true)
+        setError(false)
+        
+        // 首先检查缓存
         const cachedBlob = await getCachedImage(src)
         
         if (cachedBlob && mounted) {
           const url = createCachedImageUrl(cachedBlob)
-          urlRef.current = url
-          setCachedUrl(url)
-          setIsLoading(false)
-          onCached?.()
+          setImageUrl(url)
+          setLoading(false)
           return
         }
-
-        // 如果没有缓存，加载图片
-        const response = await fetch(src)
-        if (!response.ok) throw new Error('Failed to load image')
         
-        const blob = await response.blob()
-        const mimeType = response.headers.get('content-type') || 'image/jpeg'
-        
-        // 缓存图片
-        await cacheImage(src, blob, mimeType)
+        // 如果没有缓存，直接使用原始URL
+        setImageUrl(src)
         
         if (mounted) {
-          const url = createCachedImageUrl(blob)
-          urlRef.current = url
-          setCachedUrl(url)
-          setIsLoading(false)
+          setLoading(false)
         }
       } catch (err) {
-        console.error('Failed to load cached image:', err)
         if (mounted) {
           setError(true)
-          setIsLoading(false)
+          setLoading(false)
+          console.error('Failed to load cached image:', err)
         }
       }
     }
-
+    
     loadImage()
-
+    
     return () => {
       mounted = false
-      // 清理 blob URL
-      if (urlRef.current) {
-        URL.revokeObjectURL(urlRef.current)
+    }
+  }, [src, priority])
+
+  // 图片加载完成后缓存
+  const handleLoad = async () => {
+    if (!priority && imageUrl && src === imageUrl) {
+      try {
+        const response = await fetch(src)
+        if (response.ok) {
+          const blob = await response.blob()
+          const mimeType = response.headers.get('content-type') || 'image/jpeg'
+          await cacheImage(src, blob, mimeType)
+        }
+      } catch {
+        // 忽略缓存错误
       }
     }
-  }, [src, onCached])
+  }
 
-  if (error) {
+  if (loading) {
     return (
-      <div className={cn('flex items-center justify-center bg-muted', className)}>
-        {fallback || <span className="text-muted-foreground text-sm">加载失败</span>}
-      </div>
+      <Skeleton 
+        className={cn("bg-muted", className)} 
+      />
     )
   }
 
-  if (isLoading) {
+  if (error || !imageUrl) {
+    if (fallback) {
+      return <>{fallback}</>
+    }
     return (
-      <div className={cn('flex items-center justify-center bg-muted', className)}>
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      <div 
+        className={cn(
+          "bg-muted flex items-center justify-center text-muted-foreground",
+          className
+        )}
+      >
+        加载失败
       </div>
     )
   }
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       ref={imgRef}
-      src={cachedUrl || src}
+      src={imageUrl}
       alt={alt}
       className={className}
-      {...props}
+      onLoad={handleLoad}
+      onError={() => {
+        setError(true)
+        setLoading(false)
+      }}
+      loading={priority ? "eager" : "lazy"}
     />
   )
 } 

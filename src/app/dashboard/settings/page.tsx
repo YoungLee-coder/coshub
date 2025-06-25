@@ -91,7 +91,7 @@ export default function SettingsPage() {
         title: '缓存已清空',
         description: '所有缓存的图片已被删除'
       })
-    } catch (error) {
+    } catch {
       toast({
         title: '清空失败',
         description: '清空缓存时出现错误',
