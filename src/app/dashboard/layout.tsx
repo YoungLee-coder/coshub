@@ -20,7 +20,7 @@ const navItems = [
   },
   {
     title: '存储桶设置',
-    href: '/settings',
+    href: '/dashboard/settings',
     icon: Settings,
   },
 ]

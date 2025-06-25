@@ -10,6 +10,7 @@ CosHub 是一个现代化的腾讯云 COS（对象存储）可视化管理面板
 - 🔗 **自定义域名** - 支持配置COS自定义域名
 - 🎨 **现代化UI** - 基于 shadcn/ui 的精美界面
 - 🔒 **安全存储** - 密钥加密存储，保障数据安全
+- ⚡ **自动初始化** - 首次运行自动生成配置文件
 
 ## 技术栈
 
@@ -35,25 +36,7 @@ cd coshub
 pnpm install
 ```
 
-### 3. 配置环境变量
-
-创建 `.env.local` 文件并配置以下变量：
-
-```env
-# NextAuth配置
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-key-here-please-change-it
-
-# 数据库配置
-DATABASE_URL="file:./prisma/dev.db"
-
-# 加密密钥（用于加密存储桶密钥）
-ENCRYPTION_KEY=your-encryption-key-here-please-change-it
-```
-
-**重要**: 请务必修改 `NEXTAUTH_SECRET` 和 `ENCRYPTION_KEY` 为随机生成的安全密钥。
-
-### 4. 初始化数据库
+### 3. 初始化数据库
 
 ```bash
 # 生成Prisma客户端
@@ -63,13 +46,21 @@ pnpm db:generate
 pnpm db:push
 ```
 
-### 5. 启动开发服务器
+### 4. 启动开发服务器
 
 ```bash
 pnpm dev
 ```
 
-访问 http://localhost:3000 开始使用。
+### 5. 完成初始化
+
+访问 http://localhost:3000，系统会自动引导您：
+
+1. **首次运行时**：如果没有检测到环境配置文件，系统会自动生成 `.env.local` 文件
+2. **重启服务器**：按照提示重启服务器以应用配置
+3. **创建管理员账号**：设置您的用户名和密码
+
+就这么简单！无需手动配置环境变量。
 
 ## 项目结构
 
@@ -79,8 +70,9 @@ coshub/
 │   ├── app/                    # Next.js App Router
 │   │   ├── api/               # API 路由
 │   │   ├── dashboard/         # 主面板页面
-│   │   ├── settings/          # 设置页面
-│   │   └── login/             # 登录页面
+│   │   │   └── settings/      # 设置页面
+│   │   ├── login/             # 登录页面
+│   │   └── initialize/        # 初始化页面
 │   ├── components/            # React 组件
 │   │   ├── ui/               # 基础 UI 组件
 │   │   ├── FileManager/      # 文件管理器
@@ -102,7 +94,10 @@ coshub/
 
 ### 初始化设置
 
-首次访问时，系统会引导您创建管理员账号。请牢记您的用户名和密码。
+首次访问时，系统会引导您完成初始化：
+1. 自动生成安全的环境配置
+2. 创建管理员账号
+3. 登录后即可开始使用
 
 ### 添加存储桶
 
@@ -127,7 +122,7 @@ coshub/
 
 ```bash
 # 示例：添加Dialog组件
-pnpm dlx shadcn-ui@latest add dialog
+pnpm dlx shadcn@latest add dialog
 ```
 
 ### 数据库迁移
@@ -154,6 +149,22 @@ pnpm build
 pnpm start
 ```
 
+### 环境变量（可选）
+
+如果您需要手动配置环境变量，可以创建 `.env.local` 文件：
+
+```env
+# NextAuth配置
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-secret-key
+
+# 数据库配置
+DATABASE_URL="file:./prisma/dev.db"
+
+# 加密密钥
+ENCRYPTION_KEY=your-encryption-key
+```
+
 ### 使用 Docker（即将支持）
 
 ```bash
@@ -163,7 +174,7 @@ docker run -p 3000:3000 coshub
 
 ## 安全建议
 
-1. **修改默认密钥**: 部署前务必修改环境变量中的所有密钥
+1. **生产环境密钥**: 生产环境部署时建议重新生成所有密钥
 2. **HTTPS部署**: 生产环境建议使用HTTPS
 3. **定期备份**: 定期备份 SQLite 数据库文件
 4. **访问控制**: 可配合反向代理添加额外的访问控制

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { InitializeFormData } from '@/types'
+import { AlertCircle, CheckCircle } from 'lucide-react'
 
 const initializeSchema = z.object({
   username: z.string().min(3, '用户名至少3个字符'),
@@ -24,6 +25,7 @@ export default function InitializePage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [needRestart, setNeedRestart] = useState(false)
   
   const {
     register,
@@ -32,6 +34,24 @@ export default function InitializePage() {
   } = useForm<InitializeFormData>({
     resolver: zodResolver(initializeSchema),
   })
+  
+  // 检查环境配置状态
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/auth/initialize')
+        const data = await res.json()
+        
+        if (!data.hasEnvConfig) {
+          setError('检测到缺少环境配置，将在初始化时自动创建')
+        }
+      } catch (err) {
+        console.error('Failed to check status:', err)
+      }
+    }
+    
+    checkStatus()
+  }, [])
   
   const onSubmit = async (data: InitializeFormData) => {
     setIsLoading(true)
@@ -51,6 +71,12 @@ export default function InitializePage() {
         return
       }
       
+      if (result.needRestart) {
+        // 需要重启服务器
+        setNeedRestart(true)
+        return
+      }
+      
       // 初始化成功，跳转到登录页
       router.push('/login')
     } catch (err) {
@@ -58,6 +84,34 @@ export default function InitializePage() {
     } finally {
       setIsLoading(false)
     }
+  }
+  
+  if (needRestart) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              环境配置已创建
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              环境配置文件 <code className="bg-secondary px-1 py-0.5 rounded">.env.local</code> 已自动创建。
+            </p>
+            <div className="bg-secondary p-4 rounded-md">
+              <p className="text-sm font-medium mb-2">请按以下步骤操作：</p>
+              <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                <li>在终端中按 <kbd className="bg-primary/10 px-1 py-0.5 rounded text-xs">Ctrl+C</kbd> 停止服务器</li>
+                <li>运行 <code className="bg-primary/10 px-1 py-0.5 rounded text-xs">pnpm dev</code> 重新启动</li>
+                <li>刷新此页面继续初始化</li>
+              </ol>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
   
   return (
@@ -111,8 +165,9 @@ export default function InitializePage() {
             </div>
             
             {error && (
-              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
-                {error}
+              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>{error}</span>
               </div>
             )}
             

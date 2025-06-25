@@ -84,4 +84,10 @@ export interface InitializeFormData {
   username: string;
   password: string;
   confirmPassword: string;
+}
+
+export interface EnvConfig {
+  nextAuthUrl: string;
+  nextAuthSecret: string;
+  encryptionKey: string;
 } 

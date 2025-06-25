@@ -1,8 +1,38 @@
 # CosHub 快速设置指南
 
-## 环境变量配置
+## 自动初始化
 
-在项目根目录创建 `.env.local` 文件，并添加以下内容：
+CosHub 现在支持自动初始化！首次运行时，系统会自动为您生成安全的配置文件。
+
+### 快速开始步骤
+
+1. **安装依赖**
+   ```bash
+   pnpm install
+   ```
+
+2. **初始化数据库**
+   ```bash
+   pnpm db:push
+   ```
+
+3. **启动服务器**
+   ```bash
+   pnpm dev
+   ```
+
+4. **访问初始化页面**
+   - 打开浏览器访问 http://localhost:3000
+   - 系统会自动跳转到初始化页面
+
+5. **完成初始化**
+   - 如果系统检测到缺少环境配置，会自动生成 `.env.local` 文件
+   - 按照提示重启服务器（Ctrl+C 停止，然后重新运行 `pnpm dev`）
+   - 刷新页面，创建您的管理员账号
+
+## 手动配置（可选）
+
+如果您希望手动配置环境变量，可以在项目根目录创建 `.env.local` 文件：
 
 ```env
 # NextAuth配置
@@ -56,25 +86,6 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 1. 在腾讯云COS控制台中配置域名
 2. 完成域名验证和CNAME配置
 3. 在CosHub中添加存储桶时填写自定义域名
-
-## 运行项目
-
-1. 安装依赖：
-   ```bash
-   pnpm install
-   ```
-
-2. 初始化数据库：
-   ```bash
-   pnpm db:push
-   ```
-
-3. 启动开发服务器：
-   ```bash
-   pnpm dev
-   ```
-
-4. 访问 http://localhost:3000 开始使用
 
 ## 首次使用
 

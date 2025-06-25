@@ -1,73 +1,90 @@
-import { type ClassValue, clsx } from "clsx"
+import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// 格式化文件大小
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
-  
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+// 服务器端加密解密函数
+let crypto: typeof import('crypto') | undefined
+
+if (typeof window === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  crypto = require('crypto')
 }
 
-// 格式化日期
-export function formatDate(date: Date | string): string {
-  const d = new Date(date)
-  return d.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+// 获取加密密钥
+function getEncryptionKey(): string {
+  const key = process.env.ENCRYPTION_KEY
+  if (!key) {
+    throw new Error('ENCRYPTION_KEY is not set in environment variables')
+  }
+  return key
 }
 
-// 获取文件扩展名
+// 加密函数（仅服务器端）
+export function encrypt(text: string): string {
+  if (!crypto) {
+    throw new Error('Crypto operations are only available on the server side')
+  }
+  
+  const algorithm = 'aes-256-gcm'
+  const key = crypto.scryptSync(getEncryptionKey(), 'salt', 32)
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv(algorithm, key, iv)
+  
+  let encrypted = cipher.update(text, 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  
+  const authTag = cipher.getAuthTag()
+  
+  return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted
+}
+
+// 解密函数（仅服务器端）
+export function decrypt(encryptedData: string): string {
+  if (!crypto) {
+    throw new Error('Crypto operations are only available on the server side')
+  }
+  
+  const parts = encryptedData.split(':')
+  if (parts.length !== 3) {
+    throw new Error('Invalid encrypted data format')
+  }
+  
+  const algorithm = 'aes-256-gcm'
+  const key = crypto.scryptSync(getEncryptionKey(), 'salt', 32)
+  const iv = Buffer.from(parts[0], 'hex')
+  const authTag = Buffer.from(parts[1], 'hex')
+  const encrypted = parts[2]
+  
+  const decipher = crypto.createDecipheriv(algorithm, key, iv)
+  decipher.setAuthTag(authTag)
+  
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+  decrypted += decipher.final('utf8')
+  
+  return decrypted
+}
+
+// 文件相关工具函数
 export function getFileExtension(filename: string): string {
   const parts = filename.split('.')
   return parts.length > 1 ? parts.pop()!.toLowerCase() : ''
 }
 
-// 判断是否为图片文件
 export function isImageFile(filename: string): boolean {
   const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'ico']
   const ext = getFileExtension(filename)
   return imageExtensions.includes(ext)
 }
 
-// 判断是否为视频文件
 export function isVideoFile(filename: string): boolean {
   const videoExtensions = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv', 'webm']
   const ext = getFileExtension(filename)
   return videoExtensions.includes(ext)
 }
 
-// 判断是否需要生成缩略图
 export function shouldGenerateThumbnail(filename: string): boolean {
   return isImageFile(filename) || isVideoFile(filename)
 }
-
-// 生成随机字符串
-export function generateRandomString(length: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
-}
-
-// 加密/解密工具（简单的base64，实际应用中应使用更安全的方法）
-export function encrypt(text: string): string {
-  return Buffer.from(text).toString('base64')
-}
-
-export function decrypt(text: string): string {
-  return Buffer.from(text, 'base64').toString('utf-8')
-} 

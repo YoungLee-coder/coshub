@@ -1,14 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Upload, FolderOpen } from 'lucide-react'
+import { BucketSelector } from '@/components/BucketSelector'
+import { FileManager } from '@/components/FileManager'
+import { useBucketStore } from '@/stores/bucket'
 
 export default function DashboardPage() {
   const { data: session } = useSession()
-  const [selectedBucket, setSelectedBucket] = useState<string | null>(null)
+  const router = useRouter()
+  const { selectedBucket } = useBucketStore()
+  
+  const handleAddBucket = () => {
+    router.push('/dashboard/settings')
+  }
   
   return (
     <div className="h-full flex flex-col">
@@ -22,20 +29,13 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
-              <FolderOpen className="h-4 w-4 mr-2" />
-              选择存储桶
-            </Button>
-            <Button>
-              <Upload className="h-4 w-4 mr-2" />
-              上传文件
-            </Button>
+            <BucketSelector onAddBucket={handleAddBucket} />
           </div>
         </div>
       </div>
       
       {/* 主内容区 */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 overflow-auto">
         {!selectedBucket ? (
           <Card>
             <CardHeader>
@@ -57,16 +57,29 @@ export default function DashboardPage() {
                 </ul>
                 <div className="pt-4">
                   <Button asChild>
-                    <a href="/settings">前往设置</a>
+                    <a href="/dashboard/settings">前往设置</a>
                   </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         ) : (
-          <div>
-            {/* 这里将显示文件列表 */}
-            <p>文件管理器组件即将实现...</p>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>{selectedBucket.name}</CardTitle>
+                <CardDescription>
+                  {selectedBucket.description || `地域: ${selectedBucket.region}`}
+                  {selectedBucket.customDomain && (
+                    <span className="block mt-1">
+                      自定义域名: {selectedBucket.customDomain}
+                    </span>
+                  )}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            
+            <FileManager bucketId={selectedBucket.id} />
           </div>
         )}
       </div>

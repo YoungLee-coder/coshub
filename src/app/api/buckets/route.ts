@@ -15,30 +15,31 @@ export async function GET() {
   
   try {
     const buckets = await prisma.bucket.findMany({
-      select: {
-        id: true,
-        name: true,
-        region: true,
-        customDomain: true,
-        description: true,
-        isDefault: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: { files: true }
-        }
-      },
       orderBy: { createdAt: 'desc' }
     })
     
-    // 格式化数据
-    const formattedBuckets = buckets.map((bucket: any) => ({
-      ...bucket,
-      fileCount: bucket._count.files,
-      _count: undefined
-    }))
+    // 构建响应数据，包含统计信息
+    const bucketsWithStats = await Promise.all(
+      buckets.map(async (bucket) => {
+        const fileCount = await prisma.file.count({
+          where: { bucketId: bucket.id }
+        })
+        
+        const totalSize = await prisma.file.aggregate({
+          where: { bucketId: bucket.id },
+          _sum: { size: true }
+        })
+        
+        return {
+          ...bucket,
+          secretKey: undefined, // 不返回密钥
+          fileCount,
+          totalSize: totalSize._sum.size || 0
+        } as Omit<typeof bucket, 'secretKey'> & { fileCount: number; totalSize: number }
+      })
+    )
     
-    return NextResponse.json(formattedBuckets)
+    return NextResponse.json(bucketsWithStats)
   } catch (error) {
     console.error('Failed to fetch buckets:', error)
     return NextResponse.json({ error: '获取存储桶列表失败' }, { status: 500 })
