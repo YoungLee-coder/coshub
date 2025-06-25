@@ -5,7 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, Download, Trash2, Eye, Folder, FolderOpen, ChevronRight } from 'lucide-react'
+import { MoreHorizontal, Download, Trash2, Eye, Folder, FolderOpen, ChevronRight, Link2 } from 'lucide-react'
 import { FileWithUrl } from '@/types'
 
 interface VirtualFileListProps {
@@ -17,6 +17,7 @@ interface VirtualFileListProps {
   onPreviewFile: (file: FileWithUrl) => void
   onDeleteFile: (fileId: string) => void
   onNavigateToFolder: (path: string) => void
+  onCopyLink: (file: FileWithUrl) => void
   getFilePreview: (file: FileWithUrl) => React.ReactNode
   formatFileSize: (size: number) => string
   formatDate: (date: Date | string) => string
@@ -31,6 +32,7 @@ export function VirtualFileList({
   onPreviewFile,
   onDeleteFile,
   onNavigateToFolder,
+  onCopyLink,
   getFilePreview,
   formatFileSize,
   formatDate
@@ -185,6 +187,10 @@ export function VirtualFileList({
                       <DropdownMenuItem onClick={() => window.open(file.url + '?response-content-disposition=attachment', '_blank')}>
                         <Download className="h-4 w-4 mr-2" />
                         下载
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onCopyLink(file)}>
+                        <Link2 className="h-4 w-4 mr-2" />
+                        复制链接
                       </DropdownMenuItem>
                       {file.id && (
                         <DropdownMenuItem

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { FileIcon, ImageIcon, VideoIcon, MoreHorizontal, Download, Trash2, Eye, Upload, Loader2, FolderOpen, Search, X, SlidersHorizontal, Folder, FolderPlus, ChevronRight, Home, Archive } from 'lucide-react'
+import { FileIcon, ImageIcon, VideoIcon, MoreHorizontal, Download, Trash2, Eye, Upload, Loader2, FolderOpen, Search, X, SlidersHorizontal, Folder, FolderPlus, ChevronRight, Home, Archive, Grid3x3, List, Copy, Link2 } from 'lucide-react'
 import { FileWithUrl } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { ThumbnailViewer } from '@/components/ThumbnailViewer'
@@ -20,6 +20,9 @@ import { cn } from '@/lib/utils'
 import { VirtualFileList } from './VirtualFileList'
 import { FileSkeleton } from './FileSkeleton'
 import { Skeleton } from '@/components/ui/skeleton'
+import { usePreferences } from '@/stores/preferences'
+import { GridView } from './GridView'
+import { useBucketStore } from '@/stores/bucket'
 
 // 工具函数
 function formatFileSize(bytes: number): string {
@@ -111,6 +114,15 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   const [newFolderName, setNewFolderName] = useState('')
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { viewMode, setViewMode } = usePreferences()
+  const { selectedBucket } = useBucketStore()
+  
+  // 当 selectedBucket 变化时，刷新文件列表
+  useEffect(() => {
+    if (selectedBucket?.id === bucketId) {
+      queryClient.invalidateQueries({ queryKey: ['files', bucketId, currentPath] })
+    }
+  }, [selectedBucket, bucketId, currentPath, queryClient])
   
   // 获取文件列表
   const { data: allData = { files: [], folders: [] }, isLoading } = useQuery({
@@ -421,8 +433,8 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     return <FileIcon className="h-4 w-4" />
   }
   
-  // 获取文件图标或缩略图
-  const getFilePreview = (file: FileWithUrl) => {
+  // 获取列表视图的文件预览（40x40）
+  const getListFilePreview = (file: FileWithUrl) => {
     // 如果有缩略图，显示缩略图
     if (file.thumbnailUrl && (isImageFile(file.name) || isVideoFile(file.name))) {
       return (
@@ -432,13 +444,17 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
             src={file.thumbnailUrl}
             alt={file.name}
             className="w-full h-full object-cover"
+            loading="lazy"
             onError={(e) => {
               // 如果缩略图加载失败，显示默认图标
-              const parent = e.currentTarget.parentElement
+              const target = e.currentTarget as HTMLImageElement
+              target.style.display = 'none'
+              const parent = target.parentElement
               if (parent) {
-                parent.innerHTML = ''
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                parent.appendChild(getFileIcon(file.name) as any)
+                const iconWrapper = document.createElement('div')
+                iconWrapper.className = 'w-full h-full flex items-center justify-center'
+                parent.appendChild(iconWrapper)
+                iconWrapper.appendChild(getFileIcon(file.name) as any)
               }
             }}
           />
@@ -447,7 +463,48 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     }
     
     // 否则显示图标
-    return getFileIcon(file.name)
+    return <div className="w-10 h-10 flex items-center justify-center bg-muted rounded">
+      {getFileIcon(file.name)}
+    </div>
+  }
+  
+  // 获取文件图标或缩略图（用于网格视图）
+  const getFilePreview = (file: FileWithUrl) => {
+    // 如果有缩略图，显示缩略图
+    if (file.thumbnailUrl && (isImageFile(file.name) || isVideoFile(file.name))) {
+      return (
+        <div className="relative w-full h-full rounded overflow-hidden bg-muted">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={file.thumbnailUrl}
+            alt={file.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              // 如果缩略图加载失败，显示默认图标
+              const parent = e.currentTarget.parentElement
+              if (parent) {
+                parent.innerHTML = ''
+                const iconWrapper = document.createElement('div')
+                iconWrapper.className = 'w-full h-full flex items-center justify-center'
+                parent.appendChild(iconWrapper)
+                // 根据文件类型创建图标元素
+                const icon = isImageFile(file.name) ? 
+                  '<svg class="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>' : 
+                  isVideoFile(file.name) ? 
+                  '<svg class="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>' :
+                  '<svg class="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>'
+                iconWrapper.innerHTML = icon
+              }
+            }}
+          />
+        </div>
+      )
+    }
+    
+    // 否则显示图标
+    const IconComponent = isImageFile(file.name) ? ImageIcon : isVideoFile(file.name) ? VideoIcon : FileIcon
+    return <IconComponent className="h-8 w-8 text-muted-foreground" />
   }
   
   // 批量删除优化
@@ -577,28 +634,28 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `compressed-${Date.now()}.zip`
+      link.download = `files-${Date.now()}.zip`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
       
       toast({
-        title: '压缩完成',
+        title: '压缩下载成功',
         description: `已下载包含 ${selectedFilesData.length} 个文件的压缩包`,
       })
       
       setSelectedFiles(new Set())
     } catch (error) {
       toast({
-        title: '压缩失败',
-        description: error instanceof Error ? error.message : '压缩文件时出现错误',
+        title: '压缩下载失败',
+        description: error instanceof Error ? error.message : '压缩下载过程中出现错误',
         variant: 'destructive',
       })
     }
   }
   
-  // 处理文件拖拽
+  // 拖拽处理函数
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -608,15 +665,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
-    // 检查是否真正离开了拖拽区域
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX
-    const y = e.clientY
-    
-    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
-      setIsDragging(false)
-    }
+    setIsDragging(false)
   }, [])
   
   const handleDrop = useCallback(async (e: React.DragEvent) => {
@@ -624,10 +673,10 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     e.stopPropagation()
     setIsDragging(false)
     
-    const files = Array.from(e.dataTransfer.files)
+    const files = e.dataTransfer.files
     if (files.length === 0) return
     
-    // 创建一个虚拟的 input change 事件来复用上传逻辑
+    // 创建一个虚拟的 input change event
     const virtualEvent = {
       target: {
         files: e.dataTransfer.files,
@@ -721,9 +770,6 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   
   const breadcrumbs = getBreadcrumbs()
   
-  // 判断是否使用虚拟列表
-  const useVirtualList = allFiles.length + allFolders.length > 50
-  
   // 预取子文件夹数据
   const prefetchFolder = useCallback(async (folderPath: string) => {
     await queryClient.prefetchQuery({
@@ -765,6 +811,15 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       staleTime: 5 * 60 * 1000,
     })
   }, [bucketId, queryClient])
+  
+  // 复制文件链接
+  const handleCopyLink = (file: FileWithUrl) => {
+    navigator.clipboard.writeText(file.url)
+    toast({
+      title: '链接已复制',
+      description: '文件链接已复制到剪贴板',
+    })
+  }
   
   if (isLoading) {
     return (
@@ -848,6 +903,26 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
             <FolderPlus className="h-4 w-4 mr-2" />
             新建文件夹
           </Button>
+          
+          {/* 视图切换按钮 */}
+          <div className="flex items-center rounded-md border">
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="rounded-r-none"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="rounded-l-none"
+              onClick={() => setViewMode('grid')}
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </Button>
+          </div>
           
           {selectedFiles.size > 0 && (
             <>
@@ -1009,8 +1084,23 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
             点击上方「上传文件」按钮或拖拽文件到此处开始上传
           </p>
         </div>
-      ) : useVirtualList ? (
-        // 使用虚拟列表
+      ) : viewMode === 'grid' ? (
+        // 网格视图
+        <GridView
+          files={files}
+          folders={allFolders}
+          selectedFiles={selectedFiles}
+          onSelectFile={handleSelectFile}
+          onPreviewFile={setPreviewFile}
+          onDeleteFile={setDeleteFileId}
+          onNavigateToFolder={navigateToFolder}
+          onCopyLink={handleCopyLink}
+          getFilePreview={getFilePreview}
+          formatFileSize={formatFileSize}
+          formatDate={formatDate}
+        />
+      ) : (
+        // 列表视图 - 统一使用虚拟列表
         <VirtualFileList
           files={files}
           folders={allFolders}
@@ -1020,139 +1110,11 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           onPreviewFile={setPreviewFile}
           onDeleteFile={setDeleteFileId}
           onNavigateToFolder={navigateToFolder}
-          getFilePreview={getFilePreview}
+          onCopyLink={handleCopyLink}
+          getFilePreview={getListFilePreview}
           formatFileSize={formatFileSize}
           formatDate={formatDate}
         />
-      ) : (
-        <div 
-          className={cn(
-            "border rounded-lg relative",
-            isDragging && "border-primary"
-          )}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          {isDragging && (
-            <div className="absolute inset-0 bg-primary/5 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center">
-              <div className="text-center">
-                <Upload className="h-12 w-12 mx-auto text-primary mb-2" />
-                <p className="text-lg font-medium">释放以上传文件</p>
-              </div>
-            </div>
-          )}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={selectedFiles.size === files.filter((f: FileWithUrl) => f.id).length && files.length > 0}
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead className="w-16">预览</TableHead>
-                <TableHead>文件名</TableHead>
-                <TableHead>大小</TableHead>
-                <TableHead>修改时间</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {/* 显示文件夹 */}
-              {allFolders.map((folder) => (
-                <TableRow key={folder.path} className="cursor-pointer hover:bg-muted/50">
-                  <TableCell>
-                    {/* 文件夹不支持选择 */}
-                  </TableCell>
-                  <TableCell>
-                    <Folder className="h-10 w-10 text-blue-500" />
-                  </TableCell>
-                  <TableCell 
-                    colSpan={3}
-                    onClick={() => navigateToFolder(folder.path)}
-                    onMouseEnter={() => prefetchFolder(folder.path)}
-                  >
-                    <span className="font-medium flex items-center gap-2">
-                      {folder.name}
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigateToFolder(folder.path)}>
-                          <FolderOpen className="h-4 w-4 mr-2" />
-                          打开
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-              
-              {/* 显示文件 */}
-              {files.map((file: FileWithUrl) => (
-                <TableRow key={file.key}>
-                  <TableCell>
-                    {file.id && (
-                      <Checkbox
-                        checked={selectedFiles.has(file.id)}
-                        onCheckedChange={(checked) => handleSelectFile(file.id!, checked as boolean)}
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      onClick={() => setPreviewFile(file)}
-                      className="hover:opacity-80 transition-opacity"
-                    >
-                      {getFilePreview(file)}
-                    </button>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium">{file.name}</span>
-                  </TableCell>
-                  <TableCell>{formatFileSize(file.size)}</TableCell>
-                  <TableCell>{formatDate(file.uploadedAt || new Date())}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setPreviewFile(file)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          预览
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => window.open(file.url + '?response-content-disposition=attachment', '_blank')}>
-                          <Download className="h-4 w-4 mr-2" />
-                          下载
-                        </DropdownMenuItem>
-                        {file.id && (
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => setDeleteFileId(file.id!)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            删除
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
       )}
       
       {/* 删除确认对话框 */}

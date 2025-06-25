@@ -39,8 +39,8 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen flex">
       {/* 侧边栏 */}
-      <div className="w-64 bg-card border-r">
-        <div className="p-6">
+      <div className="w-64 bg-card border-r flex flex-col">
+        <div className="p-6 flex-1">
           <div className="flex items-center gap-2 mb-8">
             <FolderOpen className="h-6 w-6" />
             <h1 className="text-xl font-bold">CosHub</h1>
@@ -63,17 +63,17 @@ export default function DashboardLayout({
               </Link>
             ))}
           </nav>
-          
-          <div className="absolute bottom-6 left-6 right-6">
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              退出登录
-            </Button>
-          </div>
+        </div>
+        
+        <div className="p-6">
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            退出登录
+          </Button>
         </div>
       </div>
       

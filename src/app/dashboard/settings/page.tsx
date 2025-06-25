@@ -4,10 +4,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Edit, Trash2 } from 'lucide-react'
+import { Plus, Edit, Trash2, Grid3x3, List } from 'lucide-react'
 import { BucketDialog } from '@/components/BucketDialog'
 import { BucketWithStats } from '@/types'
 import { useToast } from '@/hooks/use-toast'
+import { usePreferences } from '@/stores/preferences'
 
 
 export default function SettingsPage() {
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   const [editingBucket, setEditingBucket] = useState<BucketWithStats | null>(null)
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { viewMode, setViewMode } = usePreferences()
   
   const { data: buckets, isLoading } = useQuery({
     queryKey: ['buckets'],
@@ -60,6 +62,7 @@ export default function SettingsPage() {
   
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['buckets'] })
+    queryClient.refetchQueries({ queryKey: ['buckets'] })
   }
   
   return (
@@ -82,6 +85,42 @@ export default function SettingsPage() {
       
       {/* 主内容区 */}
       <div className="flex-1 p-6">
+        {/* 偏好设置 */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4">偏好设置</h3>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">默认视图模式</CardTitle>
+              <CardDescription>选择文件管理器的默认显示模式</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                >
+                  <List className="h-4 w-4 mr-2" />
+                  列表视图
+                </Button>
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                >
+                  <Grid3x3 className="h-4 w-4 mr-2" />
+                  网格视图
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                当前选择：{viewMode === 'list' ? '列表视图' : '网格视图'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* 存储桶列表 */}
+        <h3 className="text-lg font-semibold mb-4">存储桶列表</h3>
         {isLoading ? (
           <div className="text-center py-8">
             <p className="text-muted-foreground">加载中...</p>

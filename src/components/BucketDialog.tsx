@@ -18,7 +18,36 @@ const bucketSchema = z.object({
   region: z.string().min(1, '请选择地域'),
   secretId: z.string().min(1, '请输入SecretId'),
   secretKey: z.string().min(1, '请输入SecretKey'),
-  customDomain: z.string().url('请输入有效的URL').optional().or(z.literal('')),
+  customDomain: z.string().transform((val) => {
+    if (!val) return ''
+    // 如果没有协议，自动添加https://
+    if (val && !val.startsWith('http://') && !val.startsWith('https://')) {
+      return `https://${val}`
+    }
+    return val
+  }).refine((val) => !val || z.string().url().safeParse(val).success, {
+    message: '请输入有效的域名'
+  }),
+  description: z.string().optional(),
+  isDefault: z.boolean().optional(),
+})
+
+// 编辑模式的 schema，SecretId 和 SecretKey 是可选的
+const editBucketSchema = z.object({
+  name: z.string().min(3, '存储桶名称至少3个字符').regex(/^[a-z0-9-]+$/, '只能包含小写字母、数字和横线'),
+  region: z.string().min(1, '请选择地域'),
+  secretId: z.string().optional(),
+  secretKey: z.string().optional(),
+  customDomain: z.string().transform((val) => {
+    if (!val) return ''
+    // 如果没有协议，自动添加https://
+    if (val && !val.startsWith('http://') && !val.startsWith('https://')) {
+      return `https://${val}`
+    }
+    return val
+  }).refine((val) => !val || z.string().url().safeParse(val).success, {
+    message: '请输入有效的域名'
+  }),
   description: z.string().optional(),
   isDefault: z.boolean().optional(),
 })
@@ -70,7 +99,7 @@ export function BucketDialog({ open, onOpenChange, bucket, onSuccess }: BucketDi
     setValue,
     watch,
   } = useForm<BucketFormData>({
-    resolver: zodResolver(bucketSchema),
+    resolver: zodResolver(isEdit ? editBucketSchema : bucketSchema),
     defaultValues: {
       name: bucket?.name || '',
       region: bucket?.region || '',
@@ -180,7 +209,7 @@ export function BucketDialog({ open, onOpenChange, bucket, onSuccess }: BucketDi
                 placeholder={isEdit ? '留空则不修改' : '请输入SecretId'}
                 {...register('secretId')}
               />
-              {errors.secretId && !isEdit && (
+              {errors.secretId && (
                 <p className="text-sm text-destructive">{errors.secretId.message}</p>
               )}
             </div>
@@ -193,7 +222,7 @@ export function BucketDialog({ open, onOpenChange, bucket, onSuccess }: BucketDi
                 placeholder={isEdit ? '留空则不修改' : '请输入SecretKey'}
                 {...register('secretKey')}
               />
-              {errors.secretKey && !isEdit && (
+              {errors.secretKey && (
                 <p className="text-sm text-destructive">{errors.secretKey.message}</p>
               )}
             </div>
@@ -202,12 +231,15 @@ export function BucketDialog({ open, onOpenChange, bucket, onSuccess }: BucketDi
               <Label htmlFor="customDomain">自定义域名（可选）</Label>
               <Input
                 id="customDomain"
-                placeholder="https://cdn.example.com"
+                placeholder="cdn.example.com 或 https://cdn.example.com"
                 {...register('customDomain')}
               />
               {errors.customDomain && (
                 <p className="text-sm text-destructive">{errors.customDomain.message}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                如果不包含协议，将自动添加 https://
+              </p>
             </div>
             
             <div className="grid gap-2">

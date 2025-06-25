@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { createCosInstance, uploadFile, getFileUrl } from '@/lib/cos'
-import { generateAndUploadThumbnail } from '@/lib/thumbnail'
+import { generateAndUploadThumbnail, getThumbnailUrl } from '@/lib/thumbnail'
 
 // 获取文件列表
 export async function GET(request: NextRequest) {
@@ -32,6 +32,14 @@ export async function GET(request: NextRequest) {
     if (!bucket) {
       return NextResponse.json({ error: '存储桶不存在' }, { status: 404 })
     }
+    
+    // 调试：打印存储桶信息
+    console.log('Bucket info:', {
+      id: bucket.id,
+      name: bucket.name,
+      customDomain: bucket.customDomain,
+      hasCustomDomain: !!bucket.customDomain
+    })
     
     // 创建COS实例
     const cos = createCosInstance({
@@ -84,6 +92,27 @@ export async function GET(request: NextRequest) {
     // 合并COS文件和数据库记录
     const files = cosFiles.map((cosFile: any) => {
       const dbFile = dbFileMap.get(cosFile.key)
+      const fileUrl = getFileUrl(bucket.name, bucket.region, cosFile.key, bucket.customDomain || undefined)
+      
+      // 调试：打印第一个文件的URL
+      if (cosFiles.indexOf(cosFile) === 0) {
+        console.log('First file URL:', {
+          key: cosFile.key,
+          customDomain: bucket.customDomain,
+          generatedUrl: fileUrl
+        })
+      }
+      
+      // 动态生成缩略图URL
+      const thumbnailUrl = getThumbnailUrl(
+        bucket.name,
+        bucket.region,
+        cosFile.key,
+        bucket.customDomain || undefined,
+        dbFile?.thumbnailUrl,
+        dbFile?.type
+      )
+      
       return {
         id: dbFile?.id || null,
         key: cosFile.key,
@@ -92,8 +121,8 @@ export async function GET(request: NextRequest) {
         type: dbFile?.type || 'application/octet-stream',
         lastModified: cosFile.lastModified,
         uploadedAt: dbFile?.uploadedAt || cosFile.lastModified,
-        url: getFileUrl(bucket.name, bucket.region, cosFile.key, bucket.customDomain || undefined),
-        thumbnailUrl: dbFile?.thumbnailUrl || null,
+        url: fileUrl,
+        thumbnailUrl: thumbnailUrl,
         bucketId: bucketId
       }
     })
@@ -189,10 +218,8 @@ export async function POST(request: NextRequest) {
     try {
       thumbnailUrl = await generateAndUploadThumbnail(
         {
-          secretId: bucket.secretId,
-          secretKey: bucket.secretKey,
-          region: bucket.region,
           bucket: bucket.name,
+          region: bucket.region,
           customDomain: bucket.customDomain || undefined
         },
         key,
