@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Download, ExternalLink, X } from 'lucide-react'
 import { FileWithUrl } from '@/types'
+import { isImageFile, getFileExtension, isVideoFile } from '@/lib/utils'
+import { getPreviewParams } from '@/lib/config'
 
 // 工具函数
 function formatFileSize(bytes: number): string {
@@ -25,21 +27,16 @@ function formatDate(date: Date | string): string {
   })
 }
 
-function getFileExtension(filename: string): string {
-  const parts = filename.split('.')
-  return parts.length > 1 ? parts.pop()!.toLowerCase() : ''
-}
-
-function isImageFile(filename: string): boolean {
+// 获取文件类型
+function getFileType(filename: string): 'image' | 'video' | 'other' {
+  const ext = filename.split('.').pop()?.toLowerCase() || ''
+  
   const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'ico']
-  const ext = getFileExtension(filename)
-  return imageExtensions.includes(ext)
-}
-
-function isVideoFile(filename: string): boolean {
   const videoExtensions = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv', 'webm']
-  const ext = getFileExtension(filename)
-  return videoExtensions.includes(ext)
+  
+  if (imageExtensions.includes(ext)) return 'image'
+  if (videoExtensions.includes(ext)) return 'video'
+  return 'other'
 }
 
 interface ThumbnailViewerProps {
@@ -51,10 +48,20 @@ interface ThumbnailViewerProps {
 export function ThumbnailViewer({ file, open, onOpenChange }: ThumbnailViewerProps) {
   if (!file) return null
   
-  const isImage = isImageFile(file.name)
-  const isVideo = isVideoFile(file.name)
+  const isImage = getFileType(file.name) === 'image'
+  const isVideo = getFileType(file.name) === 'video'
   const hasPreview = isImage || isVideo || file.thumbnailUrl
   
+  // 为预览图片生成优化的 URL
+  const getOptimizedImageUrl = (url: string) => {
+    // 如果是 COS URL，添加图片处理参数
+    if (url.includes('.myqcloud.com/') || url.includes('.cos.')) {
+      const separator = url.includes('?') ? '&' : '?'
+      return `${url}${separator}${getPreviewParams()}`
+    }
+    return url
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
@@ -68,13 +75,13 @@ export function ThumbnailViewer({ file, open, onOpenChange }: ThumbnailViewerPro
             <div className="bg-secondary rounded-lg p-4 flex items-center justify-center min-h-[400px]">
               {isImage ? (
                 <img
-                  src={file.thumbnailUrl || file.url}
+                  src={getOptimizedImageUrl(file.thumbnailUrl || file.url)}
                   alt={file.name}
                   className="max-w-full max-h-[500px] object-contain rounded"
                 />
               ) : isVideo && file.thumbnailUrl ? (
                 <img
-                  src={file.thumbnailUrl}
+                  src={getOptimizedImageUrl(file.thumbnailUrl)}
                   alt={`${file.name} 预览`}
                   className="max-w-full max-h-[500px] object-contain rounded"
                 />

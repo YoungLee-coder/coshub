@@ -2,10 +2,11 @@ import sharp from 'sharp'
 import { createCosInstance, uploadFile, getFileUrl } from './cos'
 import { CosConfig } from '@/types'
 import { shouldGenerateThumbnail, isImageFile, isVideoFile } from './utils'
+import { TRAFFIC_CONTROL, getThumbnailParams } from './config'
 
-const THUMBNAIL_WIDTH = 300
-const THUMBNAIL_HEIGHT = 300
-const THUMBNAIL_QUALITY = 80
+const THUMBNAIL_WIDTH = TRAFFIC_CONTROL.thumbnail.maxWidth
+const THUMBNAIL_HEIGHT = TRAFFIC_CONTROL.thumbnail.maxHeight
+const THUMBNAIL_QUALITY = TRAFFIC_CONTROL.thumbnail.quality
 
 // 支持的图片格式（可以使用COS图片处理的格式）
 const SUPPORTED_IMAGE_FORMATS = [

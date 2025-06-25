@@ -23,6 +23,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { usePreferences } from '@/stores/preferences'
 import { GridView } from './GridView'
 import { useBucketStore } from '@/stores/bucket'
+import { isImageFile, isVideoFile, getFileExtension } from '@/lib/utils'
+import { TRAFFIC_CONTROL } from '@/lib/config'
+import { CachedImage } from '@/components/ui/cached-image'
 
 // 工具函数
 function formatFileSize(bytes: number): string {
@@ -42,23 +45,6 @@ function formatDate(date: Date | string): string {
     hour: '2-digit',
     minute: '2-digit'
   })
-}
-
-function getFileExtension(filename: string): string {
-  const parts = filename.split('.')
-  return parts.length > 1 ? parts.pop()!.toLowerCase() : ''
-}
-
-function isImageFile(filename: string): boolean {
-  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'ico']
-  const ext = getFileExtension(filename)
-  return imageExtensions.includes(ext)
-}
-
-function isVideoFile(filename: string): boolean {
-  const videoExtensions = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv', 'webm']
-  const ext = getFileExtension(filename)
-  return videoExtensions.includes(ext)
 }
 
 function isDocumentFile(filename: string): boolean {
@@ -439,24 +425,11 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     if (file.thumbnailUrl && (isImageFile(file.name) || isVideoFile(file.name))) {
       return (
         <div className="relative w-10 h-10 rounded overflow-hidden bg-muted">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <CachedImage
             src={file.thumbnailUrl}
             alt={file.name}
             className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              // 如果缩略图加载失败，显示默认图标
-              const target = e.currentTarget as HTMLImageElement
-              target.style.display = 'none'
-              const parent = target.parentElement
-              if (parent) {
-                const iconWrapper = document.createElement('div')
-                iconWrapper.className = 'w-full h-full flex items-center justify-center'
-                parent.appendChild(iconWrapper)
-                iconWrapper.appendChild(getFileIcon(file.name) as any)
-              }
-            }}
+            fallback={getFileIcon(file.name)}
           />
         </div>
       )
@@ -474,29 +447,15 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     if (file.thumbnailUrl && (isImageFile(file.name) || isVideoFile(file.name))) {
       return (
         <div className="relative w-full h-full rounded overflow-hidden bg-muted">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <CachedImage
             src={file.thumbnailUrl}
             alt={file.name}
             className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              // 如果缩略图加载失败，显示默认图标
-              const parent = e.currentTarget.parentElement
-              if (parent) {
-                parent.innerHTML = ''
-                const iconWrapper = document.createElement('div')
-                iconWrapper.className = 'w-full h-full flex items-center justify-center'
-                parent.appendChild(iconWrapper)
-                // 根据文件类型创建图标元素
-                const icon = isImageFile(file.name) ? 
-                  '<svg class="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>' : 
-                  isVideoFile(file.name) ? 
-                  '<svg class="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>' :
-                  '<svg class="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>'
-                iconWrapper.innerHTML = icon
-              }
-            }}
+            fallback={
+              <div className="w-full h-full flex items-center justify-center">
+                {getFileIcon(file.name)}
+              </div>
+            }
           />
         </div>
       )
@@ -553,18 +512,37 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     }
   }
   
-  // 批量下载文件
-  const handleBulkDownload = async () => {
-    if (selectedFiles.size === 0) return
+  // 批量下载
+  const handleBatchDownload = async () => {
+    if (selectedFiles.size === 0) {
+      toast({
+        title: '请先选择文件',
+        variant: 'destructive',
+      })
+      return
+    }
     
-    const selectedFilesData = files.filter((f: FileWithUrl) => 
-      f.id && selectedFiles.has(f.id)
-    )
+    // 检查文件数量限制
+    if (selectedFiles.size > TRAFFIC_CONTROL.batch.maxDownloadCount) {
+      toast({
+        title: '超出批量下载限制',
+        description: `最多只能同时下载 ${TRAFFIC_CONTROL.batch.maxDownloadCount} 个文件`,
+        variant: 'destructive',
+      })
+      return
+    }
     
-    // 如果只有一个文件，直接下载
-    if (selectedFilesData.length === 1) {
-      const file = selectedFilesData[0]
-      window.open(file.url + '?response-content-disposition=attachment', '_blank')
+    // 计算总文件大小
+    const selectedFilesData = files.filter(f => f.id && selectedFiles.has(f.id))
+    const totalSize = selectedFilesData.reduce((sum, file) => sum + file.size, 0)
+    
+    if (totalSize > TRAFFIC_CONTROL.batch.maxDownloadSize) {
+      const maxSizeMB = Math.round(TRAFFIC_CONTROL.batch.maxDownloadSize / 1024 / 1024)
+      toast({
+        title: '文件总大小超出限制',
+        description: `批量下载的总大小不能超过 ${maxSizeMB}MB`,
+        variant: 'destructive',
+      })
       return
     }
     
@@ -929,7 +907,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleBulkDownload}
+                onClick={handleBatchDownload}
               >
                 <Download className="h-4 w-4 mr-2" />
                 下载选中 ({selectedFiles.size})
