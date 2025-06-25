@@ -22,6 +22,7 @@ export async function GET() {
       hasEnvConfig 
     })
   } catch (error) {
+    console.error('Failed to check initialization status:', error)
     return NextResponse.json(
       { error: '检查初始化状态失败' },
       { status: 500 }

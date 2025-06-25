@@ -79,9 +79,10 @@ export default function InitializePage() {
       
       // 初始化成功，跳转到登录页
       router.push('/login')
-    } catch (err) {
-      setError('初始化失败，请重试')
-    } finally {
+          } catch (err) {
+        console.error('Initialize failed:', err)
+        setError('初始化失败，请重试')
+      } finally {
       setIsLoading(false)
     }
   }

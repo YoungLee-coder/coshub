@@ -113,6 +113,7 @@ export function BucketDialog({ open, onOpenChange, bucket, onSuccess }: BucketDi
       onOpenChange(false)
       onSuccess?.()
     } catch (error) {
+      console.error('Bucket operation failed:', error)
       toast({
         title: '操作失败',
         description: '网络错误，请重试',

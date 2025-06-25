@@ -53,6 +53,7 @@ function LoginForm() {
         router.push(callbackUrl)
       }
     } catch (err) {
+      console.error('Login error:', err)
       setError('登录失败，请重试')
     } finally {
       setIsLoading(false)

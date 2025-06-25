@@ -8,7 +8,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react'
 import { BucketDialog } from '@/components/BucketDialog'
 import { BucketWithStats } from '@/types'
 import { useToast } from '@/hooks/use-toast'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader } from '@/components/ui/alert-dialog'
+
 
 export default function SettingsPage() {
   const [isAddingBucket, setIsAddingBucket] = useState(false)
@@ -147,7 +147,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>暂无存储桶</CardTitle>
               <CardDescription>
-                点击右上角的"添加存储桶"按钮来添加您的第一个存储桶
+                点击右上角的「添加存储桶」按钮来添加您的第一个存储桶
               </CardDescription>
             </CardHeader>
           </Card>

@@ -88,3 +88,74 @@ export function isVideoFile(filename: string): boolean {
 export function shouldGenerateThumbnail(filename: string): boolean {
   return isImageFile(filename) || isVideoFile(filename)
 }
+
+// 获取文件的MIME类型
+export function getMimeType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase()
+  
+  const mimeTypes: Record<string, string> = {
+    // 图片
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    bmp: 'image/bmp',
+    svg: 'image/svg+xml',
+    ico: 'image/x-icon',
+    
+    // 视频
+    mp4: 'video/mp4',
+    avi: 'video/x-msvideo',
+    mov: 'video/quicktime',
+    wmv: 'video/x-ms-wmv',
+    flv: 'video/x-flv',
+    mkv: 'video/x-matroska',
+    webm: 'video/webm',
+    
+    // 文档
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    txt: 'text/plain',
+    md: 'text/markdown',
+    
+    // 压缩文件
+    zip: 'application/zip',
+    rar: 'application/x-rar-compressed',
+    '7z': 'application/x-7z-compressed',
+    tar: 'application/x-tar',
+    gz: 'application/gzip',
+    
+    // 代码文件
+    js: 'application/javascript',
+    ts: 'application/typescript',
+    jsx: 'text/jsx',
+    tsx: 'text/tsx',
+    json: 'application/json',
+    html: 'text/html',
+    css: 'text/css',
+    scss: 'text/scss',
+    less: 'text/less',
+    xml: 'application/xml',
+    yaml: 'application/x-yaml',
+    yml: 'application/x-yaml',
+  }
+  
+  return mimeTypes[ext || ''] || 'application/octet-stream'
+}
+
+// 检查是否应该显示缩略图
+export function shouldShowThumbnail(filename: string, fileSize: number): boolean {
+  const maxSize = 10 * 1024 * 1024 // 10MB
+  const ext = filename.split('.').pop()?.toLowerCase()
+  
+  // 只对小于10MB的图片和视频显示缩略图
+  const supportedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm']
+  
+  return fileSize < maxSize && supportedExtensions.includes(ext || '')
+}

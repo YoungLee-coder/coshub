@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { createCosInstance, listFiles, uploadFile, getFileUrl } from '@/lib/cos'
+import { createCosInstance, uploadFile, getFileUrl } from '@/lib/cos'
 import { generateAndUploadThumbnail } from '@/lib/thumbnail'
 
 // 获取文件列表
@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const bucketId = searchParams.get('bucketId')
     const prefix = searchParams.get('prefix') || ''
+    const marker = searchParams.get('marker') || ''
+    const maxKeys = parseInt(searchParams.get('maxKeys') || '1000')
     
     if (!bucketId) {
       return NextResponse.json({ error: '请提供bucketId' }, { status: 400 })
@@ -40,8 +42,31 @@ export async function GET(request: NextRequest) {
       customDomain: bucket.customDomain || undefined
     })
     
-    // 获取COS文件列表
-    const cosFiles = await listFiles(cos, bucket.name, bucket.region, prefix)
+    // 获取COS文件列表（支持分页）
+    const cosResult = await new Promise<any>((resolve, reject) => {
+      cos.getBucket({
+        Bucket: bucket.name,
+        Region: bucket.region,
+        Prefix: prefix,
+        Marker: marker,
+        MaxKeys: maxKeys,
+      }, (err, data) => {
+        if (err) {
+          reject(err)
+          return
+        }
+        resolve(data)
+      })
+    })
+    
+    const cosFiles = cosResult.Contents.map((item: any) => ({
+      key: item.Key,
+      name: item.Key.split('/').pop() || item.Key,
+      size: parseInt(item.Size),
+      lastModified: new Date(item.LastModified),
+      eTag: item.ETag,
+      storageClass: item.StorageClass,
+    }))
     
     // 获取数据库中的文件记录
     const dbFiles = await prisma.file.findMany({
@@ -57,7 +82,7 @@ export async function GET(request: NextRequest) {
     const dbFileMap = new Map(dbFiles.map(file => [file.key, file]))
     
     // 合并COS文件和数据库记录
-    const files = cosFiles.map(cosFile => {
+    const files = cosFiles.map((cosFile: any) => {
       const dbFile = dbFileMap.get(cosFile.key)
       return {
         id: dbFile?.id || null,
@@ -66,13 +91,20 @@ export async function GET(request: NextRequest) {
         size: cosFile.size,
         type: dbFile?.type || 'application/octet-stream',
         lastModified: cosFile.lastModified,
+        uploadedAt: dbFile?.uploadedAt || cosFile.lastModified,
         url: getFileUrl(bucket.name, bucket.region, cosFile.key, bucket.customDomain || undefined),
         thumbnailUrl: dbFile?.thumbnailUrl || null,
         bucketId: bucketId
       }
     })
     
-    return NextResponse.json(files)
+    // 返回分页信息
+    return NextResponse.json({
+      files,
+      nextMarker: cosResult.NextMarker || null,
+      isTruncated: cosResult.IsTruncated || false,
+      total: files.length
+    })
   } catch (error) {
     console.error('Failed to list files:', error)
     return NextResponse.json({ error: '获取文件列表失败' }, { status: 500 })
@@ -92,6 +124,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File
     const bucketId = formData.get('bucketId') as string
     const prefix = formData.get('prefix') as string || ''
+    const customKey = formData.get('key') as string || '' // 支持自定义key
     
     if (!file || !bucketId) {
       return NextResponse.json({ error: '请提供文件和bucketId' }, { status: 400 })
@@ -116,22 +149,40 @@ export async function POST(request: NextRequest) {
     })
     
     // 生成文件key
-    const timestamp = Date.now()
-    const filename = file.name
-    const key = prefix ? `${prefix}/${timestamp}-${filename}` : `${timestamp}-${filename}`
+    let key: string
+    if (customKey) {
+      // 使用自定义key（例如创建文件夹）
+      key = customKey
+    } else {
+      // 自动生成key
+      const timestamp = Date.now()
+      const filename = file.name
+      key = prefix ? `${prefix}${timestamp}-${filename}` : `${timestamp}-${filename}`
+    }
     
     // 读取文件内容
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
     
     // 上传文件到COS
-    const uploadResult = await uploadFile(
+    await uploadFile(
       cos,
       bucket.name,
       bucket.region,
       key,
       buffer
     )
+    
+    // 如果是文件夹（以/结尾），不需要生成缩略图和保存到数据库
+    if (key.endsWith('/')) {
+      return NextResponse.json({
+        key,
+        name: key.split('/').filter(Boolean).pop() || key,
+        type: 'folder',
+        url: getFileUrl(bucket.name, bucket.region, key, bucket.customDomain || undefined),
+        bucketId
+      })
+    }
     
     // 生成缩略图
     let thumbnailUrl = null
@@ -153,6 +204,7 @@ export async function POST(request: NextRequest) {
     }
     
     // 保存文件记录到数据库
+    const filename = key.split('/').pop() || key
     const dbFile = await prisma.file.create({
       data: {
         key,

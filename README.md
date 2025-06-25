@@ -1,105 +1,73 @@
-# CosHub - 腾讯云COS可视化管理面板
+# CosHub - 腾讯云 COS 可视化管理面板
 
-CosHub 是一个现代化的腾讯云 COS（对象存储）可视化管理面板，专为个人网站图床管理而设计。
+<div align="center">
+  <img src="public/logo.png" alt="CosHub Logo" width="128" height="128" />
+  <h3>一个简洁、高效的腾讯云 COS 对象存储管理工具</h3>
+  <p>专为个人网站图床管理设计，支持多存储桶管理、文件预览、批量操作等功能</p>
+</div>
 
-## 功能特性
+## ✨ 功能特性
 
-- 🚀 **单账户系统** - 简单安全的单用户管理系统
-- 📦 **多存储桶管理** - 支持管理多个COS存储桶
-- 🖼️ **智能缩略图** - 自动生成图片缩略图，减少流量消耗
-- 🔗 **自定义域名** - 支持配置COS自定义域名
-- 🎨 **现代化UI** - 基于 shadcn/ui 的精美界面
-- 🔒 **安全存储** - 密钥加密存储，保障数据安全
-- ⚡ **自动初始化** - 首次运行自动生成配置文件
+- 🗂️ **多存储桶管理** - 支持同时管理多个 COS 存储桶
+- 📁 **文件管理** - 上传、下载、删除、批量操作
+- 🖼️ **智能缩略图** - 自动生成图片和视频缩略图，节省流量
+- 🔗 **自定义域名** - 支持配置和使用自定义 CDN 域名
+- 📤 **拖拽上传** - 支持拖拽和批量上传文件
+- 🔍 **文件预览** - 支持图片、视频等多种格式在线预览
+- 🔐 **安全认证** - 内置用户认证系统，支持单用户模式
+- 🎨 **现代化界面** - 基于 shadcn/ui 的美观响应式设计
 
-## 技术栈
+## 🚀 快速开始
 
-- **框架**: Next.js 15 + TypeScript
-- **UI组件**: shadcn/ui + Tailwind CSS v3
-- **数据库**: SQLite + Prisma ORM
-- **认证**: NextAuth.js
-- **状态管理**: Zustand
-- **对象存储**: 腾讯云 COS SDK
+### 环境要求
 
-## 快速开始
+- Node.js 18.x 或更高版本
+- pnpm 包管理器
+- 腾讯云 COS 服务
 
-### 1. 克隆项目
+### 安装步骤
 
+1. **克隆项目**
 ```bash
-git clone https://github.com/yourusername/coshub.git
+git clone https://github.com/your-username/coshub.git
 cd coshub
 ```
 
-### 2. 安装依赖
-
+2. **安装依赖**
 ```bash
 pnpm install
 ```
 
-### 3. 初始化数据库
-
+3. **初始化数据库**
 ```bash
-# 生成Prisma客户端
-pnpm db:generate
-
-# 创建数据库
 pnpm db:push
 ```
 
-### 4. 启动开发服务器
-
+4. **启动开发服务器**
 ```bash
 pnpm dev
 ```
 
-### 5. 完成初始化
+5. **访问初始化页面**
+打开浏览器访问 `http://localhost:3000/initialize`，按照引导完成初始化设置。
 
-访问 http://localhost:3000，系统会自动引导您：
+### 环境配置
 
-1. **首次运行时**：如果没有检测到环境配置文件，系统会自动生成 `.env.local` 文件
-2. **重启服务器**：按照提示重启服务器以应用配置
-3. **创建管理员账号**：设置您的用户名和密码
+初始化过程会自动创建 `.env.local` 文件，包含以下配置：
 
-就这么简单！无需手动配置环境变量。
+```env
+# 应用配置
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-secret-key
+ENCRYPTION_KEY=your-encryption-key
 
-## 项目结构
-
-```
-coshub/
-├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── api/               # API 路由
-│   │   ├── dashboard/         # 主面板页面
-│   │   │   └── settings/      # 设置页面
-│   │   ├── login/             # 登录页面
-│   │   └── initialize/        # 初始化页面
-│   ├── components/            # React 组件
-│   │   ├── ui/               # 基础 UI 组件
-│   │   ├── FileManager/      # 文件管理器
-│   │   ├── BucketSelector/   # 存储桶选择器
-│   │   └── ThumbnailViewer/  # 缩略图查看器
-│   ├── lib/                  # 工具库
-│   │   ├── cos.ts           # COS SDK 封装
-│   │   ├── db.ts            # 数据库连接
-│   │   ├── thumbnail.ts     # 缩略图生成
-│   │   └── auth.ts          # 认证配置
-│   ├── stores/              # Zustand 状态管理
-│   └── types/               # TypeScript 类型定义
-├── prisma/
-│   └── schema.prisma        # 数据库模式
-└── package.json
+# 数据库配置（默认使用 SQLite）
+DATABASE_URL="file:./prisma/dev.db"
 ```
 
-## 使用指南
+## 📖 使用指南
 
-### 初始化设置
-
-首次访问时，系统会引导您完成初始化：
-1. 自动生成安全的环境配置
-2. 创建管理员账号
-3. 登录后即可开始使用
-
-### 添加存储桶
+### 1. 添加存储桶
 
 1. 登录后进入设置页面
 2. 点击"添加存储桶"
@@ -107,103 +75,67 @@ coshub/
    - 存储桶名称
    - 所在地域
    - SecretId 和 SecretKey
-   - （可选）自定义域名
+   - 自定义域名（可选）
+
+### 2. 文件管理
+
+- **上传文件**：点击"上传文件"按钮或直接拖拽文件到页面
+- **批量操作**：勾选多个文件后可进行批量删除
+- **文件预览**：点击文件名或预览图标查看详情
+- **下载文件**：在操作菜单中选择下载
+
+### 3. 缩略图配置
+
+系统会自动为图片和视频生成缩略图：
+- 图片：使用 Sharp 库生成 300x300 的缩略图
+- 视频：使用 COS 数据处理功能生成视频截帧
+
+## 🛠️ 技术栈
+
+- **框架**: Next.js 15 (App Router)
+- **语言**: TypeScript
+- **样式**: Tailwind CSS
+- **UI 组件**: shadcn/ui
+- **数据库**: Prisma + SQLite
+- **认证**: NextAuth.js
+- **状态管理**: Zustand
+- **COS SDK**: cos-nodejs-sdk-v5
+
+## 📝 API 接口
+
+### 认证相关
+- `POST /api/auth/initialize` - 系统初始化
+- `POST /api/auth/[...nextauth]` - NextAuth 认证
+
+### 存储桶管理
+- `GET /api/buckets` - 获取存储桶列表
+- `POST /api/buckets` - 创建存储桶
+- `PUT /api/buckets/[id]` - 更新存储桶
+- `DELETE /api/buckets/[id]` - 删除存储桶
 
 ### 文件管理
+- `GET /api/files` - 获取文件列表
+- `POST /api/files` - 上传文件
+- `DELETE /api/files/[id]` - 删除单个文件
+- `DELETE /api/files/batch` - 批量删除文件
 
-- 支持拖拽上传或点击上传
-- 自动生成缩略图（图片和视频）
-- 批量删除功能
-- 文件搜索和筛选
+## 🔒 安全说明
 
-## 开发指南
+- 所有敏感信息（如 SecretKey）都经过 AES-256-GCM 加密存储
+- 支持单用户模式，适合个人使用
+- 建议在生产环境中使用 HTTPS
+- 定期更新依赖以修复安全漏洞
 
-### 添加新的UI组件
-
-```bash
-# 示例：添加Dialog组件
-pnpm dlx shadcn@latest add dialog
-```
-
-### 数据库迁移
-
-```bash
-# 修改schema后执行
-pnpm db:push
-
-# 查看数据库
-pnpm db:studio
-```
-
-## 生产部署
-
-### 构建项目
-
-```bash
-pnpm build
-```
-
-### 启动生产服务器
-
-```bash
-pnpm start
-```
-
-### 环境变量（可选）
-
-如果您需要手动配置环境变量，可以创建 `.env.local` 文件：
-
-```env
-# NextAuth配置
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-key
-
-# 数据库配置
-DATABASE_URL="file:./prisma/dev.db"
-
-# 加密密钥
-ENCRYPTION_KEY=your-encryption-key
-```
-
-### 使用 Docker（即将支持）
-
-```bash
-docker build -t coshub .
-docker run -p 3000:3000 coshub
-```
-
-## 安全建议
-
-1. **生产环境密钥**: 生产环境部署时建议重新生成所有密钥
-2. **HTTPS部署**: 生产环境建议使用HTTPS
-3. **定期备份**: 定期备份 SQLite 数据库文件
-4. **访问控制**: 可配合反向代理添加额外的访问控制
-
-## 常见问题
-
-### Q: 如何重置密码？
-
-A: 目前需要直接修改数据库。后续版本将添加密码重置功能。
-
-### Q: 支持哪些地域？
-
-A: 支持腾讯云COS的所有地域，包括：
-- ap-beijing (北京)
-- ap-shanghai (上海)
-- ap-guangzhou (广州)
-- ap-chengdu (成都)
-- 等等...
-
-### Q: 缩略图占用额外存储吗？
-
-A: 
-- 图片缩略图会上传到COS占用少量存储
-- 视频缩略图使用COS的实时处理功能，不占用额外存储
-
-## 贡献指南
+## 🤝 贡献指南
 
 欢迎提交 Issue 和 Pull Request！
 
-## 许可证
+## 📄 许可证
 
 MIT License
+
+---
+
+<div align="center">
+  <p>Made with ❤️ by CosHub Team</p>
+</div>
