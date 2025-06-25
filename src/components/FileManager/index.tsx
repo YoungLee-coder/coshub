@@ -157,11 +157,6 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   
   const { files: allFiles, folders: allFolders } = allData
   
-  // 调试日志
-  console.log('FileManager - allData:', allData)
-  console.log('FileManager - allFiles:', allFiles)
-  console.log('FileManager - allFolders:', allFolders)
-  
   // 过滤文件和文件夹（文件夹不需要过滤）
   
   // 过滤文件列表

@@ -33,13 +33,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '存储桶不存在' }, { status: 404 })
     }
     
-    // 调试：打印存储桶信息
-    console.log('Bucket info:', {
-      id: bucket.id,
-      name: bucket.name,
-      customDomain: bucket.customDomain,
-      hasCustomDomain: !!bucket.customDomain
-    })
+
     
     // 创建COS实例
     const cos = createCosInstance({
@@ -94,14 +88,7 @@ export async function GET(request: NextRequest) {
       const dbFile = dbFileMap.get(cosFile.key)
       const fileUrl = getFileUrl(bucket.name, bucket.region, cosFile.key, bucket.customDomain || undefined)
       
-      // 调试：打印第一个文件的URL
-      if (cosFiles.indexOf(cosFile) === 0) {
-        console.log('First file URL:', {
-          key: cosFile.key,
-          customDomain: bucket.customDomain,
-          generatedUrl: fileUrl
-        })
-      }
+
       
       // 动态生成缩略图URL
       const thumbnailUrl = getThumbnailUrl(
