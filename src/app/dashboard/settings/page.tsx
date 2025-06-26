@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Edit, Trash2, Grid3x3, List, HardDrive, RefreshCw, User, Key } from 'lucide-react'
+import { Plus, Edit, Trash2, Grid3x3, List, HardDrive, RefreshCw, User, Key, ChevronDown, ChevronUp } from 'lucide-react'
 import { BucketDialog } from '@/components/BucketDialog'
 import { BucketWithStats } from '@/types'
 import { useToast } from '@/hooks/use-toast'
@@ -36,13 +36,18 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   
+  // 添加折叠状态
+  const [isAccountExpanded, setIsAccountExpanded] = useState(false)
+  
   const { data: buckets, isLoading: bucketsLoading } = useQuery({
     queryKey: ['buckets'],
     queryFn: async () => {
       const res = await fetch('/api/buckets')
       if (!res.ok) throw new Error('Failed to fetch buckets')
       return res.json()
-    }
+    },
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   })
   
   const deleteMutation = useMutation({
@@ -84,18 +89,18 @@ export default function SettingsPage() {
   }
 
   // 获取缓存大小
-  const fetchCacheSize = async () => {
+  const fetchCacheSize = useCallback(async () => {
     try {
       const size = await getCacheSize()
       setCacheSize(size)
     } catch (error) {
       console.error('Failed to get cache size:', error)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchCacheSize()
-  }, [])
+  }, [fetchCacheSize])
 
   // 清空缓存
   const handleClearCache = async () => {
@@ -248,6 +253,27 @@ export default function SettingsPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
+  // 添加手动刷新函数
+  const refreshBuckets = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['buckets'] })
+  }, [queryClient])
+  
+  // 监听页面可见性变化
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshBuckets()
+        fetchCacheSize() // 同时刷新缓存大小
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [refreshBuckets, fetchCacheSize])
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-8">
@@ -259,116 +285,136 @@ export default function SettingsPage() {
         {/* 账号管理 */}
         <div>
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                账号管理
-              </CardTitle>
-              <CardDescription>
-                管理您的账号信息和安全设置
-              </CardDescription>
+            <CardHeader 
+              className="cursor-pointer select-none"
+              onClick={() => setIsAccountExpanded(!isAccountExpanded)}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    账号管理
+                  </CardTitle>
+                  <CardDescription>
+                    管理您的账号信息和安全设置
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
+                  {isAccountExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-6 divide-y md:divide-y-0 md:divide-x">
-                {/* 左侧：用户信息和修改用户名 */}
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="font-medium mb-4 flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      用户信息
-                    </h4>
-                    
-                    <div className="space-y-4">
-                      <div className="bg-muted/50 rounded-lg p-4">
-                        <Label className="text-sm text-muted-foreground">当前用户名</Label>
-                        <p className="text-lg font-medium mt-1">{session?.user?.name || 'admin'}</p>
-                      </div>
+            {isAccountExpanded && (
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-6 divide-y md:divide-y-0 md:divide-x">
+                  {/* 左侧：用户信息和修改用户名 */}
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="font-medium mb-4 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        用户信息
+                      </h4>
                       
-                      <div className="space-y-2">
-                        <Label htmlFor="new-username">新用户名</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="new-username"
-                            type="text"
-                            value={newUsername}
-                            onChange={(e) => setNewUsername(e.target.value)}
-                            placeholder="至少3位字符"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && newUsername.trim()) {
-                                handleChangeUsername()
-                              }
-                            }}
-                          />
-                          <Button 
-                            onClick={handleChangeUsername}
-                            disabled={isChangingUsername || !newUsername.trim()}
-                            className="shrink-0"
-                          >
-                            {isChangingUsername ? '修改中...' : '修改'}
-                          </Button>
+                      <div className="space-y-4">
+                        <div className="bg-muted/50 rounded-lg p-4">
+                          <Label className="text-sm text-muted-foreground">当前用户名</Label>
+                          <p className="text-lg font-medium mt-1">{session?.user?.name || 'admin'}</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="new-username">新用户名</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="new-username"
+                              type="text"
+                              value={newUsername}
+                              onChange={(e) => setNewUsername(e.target.value)}
+                              placeholder="至少3位字符"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newUsername.trim()) {
+                                  handleChangeUsername()
+                                }
+                              }}
+                            />
+                            <Button 
+                              onClick={handleChangeUsername}
+                              disabled={isChangingUsername || !newUsername.trim()}
+                              className="shrink-0"
+                            >
+                              {isChangingUsername ? '修改中...' : '修改'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                
-                {/* 右侧：修改密码 */}
-                <div className="pt-6 md:pt-0 md:pl-6">
-                  <h4 className="font-medium mb-4 flex items-center gap-2">
-                    <Key className="h-4 w-4" />
-                    安全设置
-                  </h4>
                   
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="current-password">当前密码</Label>
-                      <Input
-                        id="current-password"
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="请输入当前密码"
-                      />
-                    </div>
+                  {/* 右侧：修改密码 */}
+                  <div className="pt-6 md:pt-0 md:pl-6">
+                    <h4 className="font-medium mb-4 flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      安全设置
+                    </h4>
                     
-                    <div>
-                      <Label htmlFor="new-password">新密码</Label>
-                      <Input
-                        id="new-password"
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="至少6位字符"
-                      />
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="current-password">当前密码</Label>
+                        <Input
+                          id="current-password"
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="请输入当前密码"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="new-password">新密码</Label>
+                        <Input
+                          id="new-password"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="至少6位字符"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="confirm-password">确认新密码</Label>
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="请再次输入新密码"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && currentPassword && newPassword && confirmPassword) {
+                              handleChangePassword()
+                            }
+                          }}
+                        />
+                      </div>
+                      
+                      <Button 
+                        onClick={handleChangePassword}
+                        disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                        className="w-full"
+                      >
+                        {isChangingPassword ? '修改中...' : '修改密码'}
+                      </Button>
                     </div>
-                    
-                    <div>
-                      <Label htmlFor="confirm-password">确认新密码</Label>
-                      <Input
-                        id="confirm-password"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="请再次输入新密码"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && currentPassword && newPassword && confirmPassword) {
-                            handleChangePassword()
-                          }
-                        }}
-                      />
-                    </div>
-                    
-                    <Button 
-                      onClick={handleChangePassword}
-                      disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
-                      className="w-full"
-                    >
-                      {isChangingPassword ? '修改中...' : '修改密码'}
-                    </Button>
                   </div>
                 </div>
-              </div>
-            </CardContent>
+              </CardContent>
+            )}
           </Card>
         </div>
         

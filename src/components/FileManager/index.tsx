@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { FileIcon, ImageIcon, VideoIcon, Download, Trash2, Upload, Loader2, FolderOpen, Search, X, SlidersHorizontal, FolderPlus, ChevronRight, Home, Archive, Grid3x3, List } from 'lucide-react'
+import { FileIcon, ImageIcon, VideoIcon, Download, Trash2, Upload, Loader2, Search, X, SlidersHorizontal, FolderPlus, ChevronRight, Home, Archive, Grid3x3, List } from 'lucide-react'
 import { FileWithUrl } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { ThumbnailViewer } from '@/components/ThumbnailViewer'
@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
 import { VirtualFileList } from './VirtualFileList'
 import { FileSkeleton } from './FileSkeleton'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -86,7 +85,6 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   const [previewFile, setPreviewFile] = useState<FileWithUrl | null>(null)
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([])
   const [showUploadProgress, setShowUploadProgress] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     query: '',
     type: 'all',
@@ -247,6 +245,8 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
         description: '文件已删除',
       })
       queryClient.invalidateQueries({ queryKey: ['files', bucketId] })
+      // 刷新存储桶列表以更新统计信息
+      queryClient.invalidateQueries({ queryKey: ['buckets'] })
       setDeleteFileId(null)
     },
     onError: (error: Error) => {
@@ -363,6 +363,8 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
         })
         
         queryClient.invalidateQueries({ queryKey: ['files', bucketId] })
+        // 刷新存储桶列表以更新统计信息
+        queryClient.invalidateQueries({ queryKey: ['buckets'] })
       }
     } catch (error) {
       toast({
@@ -495,6 +497,8 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       })
       
       queryClient.invalidateQueries({ queryKey: ['files', bucketId] })
+      // 刷新存储桶列表以更新统计信息
+      queryClient.invalidateQueries({ queryKey: ['buckets'] })
       setSelectedFiles(new Set())
     } catch (error) {
       toast({
@@ -626,37 +630,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     }
   }
   
-  // 拖拽处理函数
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(true)
-  }, [])
-  
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-  }, [])
-  
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-    
-    const files = e.dataTransfer.files
-    if (files.length === 0) return
-    
-    // 创建一个虚拟的 input change event
-    const virtualEvent = {
-      target: {
-        files: e.dataTransfer.files,
-        value: ''
-      }
-    } as React.ChangeEvent<HTMLInputElement>
-    
-    await handleFileUpload(virtualEvent)
-  }, [handleFileUpload])
+
   
   // 创建文件夹
   const handleCreateFolder = async () => {
@@ -999,50 +973,38 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       </div>
       
       {/* 文件列表 */}
-      {files.length === 0 && allFolders.length === 0 ? (
-        <div 
-          className={cn(
-            "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-            isDragging ? "border-primary bg-primary/5" : "border-border"
-          )}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">该目录下暂无文件或文件夹</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            点击上方「上传文件」按钮或拖拽文件到此处开始上传
-          </p>
-        </div>
-      ) : viewMode === 'grid' ? (
-        // 网格视图
-        <GridView
-          files={files}
-          folders={allFolders}
-          selectedFiles={selectedFiles}
-          onSelectFile={handleSelectFile}
-          onPreviewFile={setPreviewFile}
-          onDeleteFile={setDeleteFileId}
-          onNavigateToFolder={navigateToFolder}
-          onCopyLink={handleCopyLink}
-          getFilePreview={getFilePreview}
-          formatFileSize={formatFileSize}
-          formatDate={formatDate}
-        />
-      ) : (
-        // 列表视图 - 统一使用虚拟列表
+      {isLoading ? (
+        viewMode === 'list' ? (
+          <FileSkeleton type="list" />
+        ) : (
+          <FileSkeleton type="grid" />
+        )
+      ) : viewMode === 'list' ? (
         <VirtualFileList
           files={files}
-          folders={allFolders}
+          folders={searchFilters.query.trim() ? [] : allFolders}
           selectedFiles={selectedFiles}
           onSelectFile={handleSelectFile}
           onSelectAll={handleSelectAll}
           onPreviewFile={setPreviewFile}
-          onDeleteFile={setDeleteFileId}
+          onDeleteFile={(id) => setDeleteFileId(id)}
           onNavigateToFolder={navigateToFolder}
           onCopyLink={handleCopyLink}
           getFilePreview={getListFilePreview}
+          formatFileSize={formatFileSize}
+          formatDate={formatDate}
+        />
+      ) : (
+        <GridView
+          files={files}
+          folders={searchFilters.query.trim() ? [] : allFolders}
+          selectedFiles={selectedFiles}
+          onSelectFile={handleSelectFile}
+          onPreviewFile={setPreviewFile}
+          onDeleteFile={(id) => setDeleteFileId(id)}
+          onNavigateToFolder={navigateToFolder}
+          onCopyLink={handleCopyLink}
+          getFilePreview={getFilePreview}
           formatFileSize={formatFileSize}
           formatDate={formatDate}
         />

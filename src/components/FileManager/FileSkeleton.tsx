@@ -2,12 +2,33 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface FileSkeletonProps {
   rows?: number
+  type?: 'list' | 'grid'
 }
 
-export function FileSkeleton({ rows = 5 }: FileSkeletonProps) {
+export function FileSkeleton({ rows = 5, type = 'list' }: FileSkeletonProps) {
+  if (type === 'grid') {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+        {Array.from({ length: rows * 3 }).map((_, index) => (
+          <Card key={index}>
+            <CardContent className="p-4">
+              <div className="flex flex-col items-center text-center">
+                <Skeleton className="h-24 w-24 mb-2" />
+                <Skeleton className="h-4 w-full mb-1" />
+                <Skeleton className="h-3 w-20 mb-1" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+  
   return (
     <div className="border rounded-lg">
       <Table>
