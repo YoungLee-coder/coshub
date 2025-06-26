@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { FileIcon, ImageIcon, VideoIcon, Download, Trash2, Upload, Loader2, Search, X, SlidersHorizontal, FolderPlus, ChevronRight, Home, Archive, Grid3x3, List } from 'lucide-react'
+import { FileIcon, ImageIcon, VideoIcon, Download, Trash2, Upload, Loader2, Search, X, SlidersHorizontal, FolderPlus, ChevronRight, ChevronLeft, Home, Archive, Grid3x3, List } from 'lucide-react'
 import { FileWithUrl } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { ThumbnailViewer } from '@/components/ThumbnailViewer'
@@ -94,6 +94,13 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   const [currentPath, setCurrentPath] = useState(prefix)
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+  
+  // 分页相关状态
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(50) // 每页显示50个文件
+  const [hasMore, setHasMore] = useState(false)
+  const [markers, setMarkers] = useState<string[]>(['']) // 存储每页的marker，第一页为空字符串
+  
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { viewMode, setViewMode } = usePreferences()
@@ -106,11 +113,19 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     }
   }, [selectedBucket, bucketId, currentPath, queryClient])
   
+  // 重置分页状态
+  useEffect(() => {
+    setPage(1)
+    setHasMore(false)
+    setMarkers([''])
+  }, [bucketId, currentPath])
+  
   // 获取文件列表
-  const { data: allData = { files: [], folders: [] }, isLoading } = useQuery({
-    queryKey: ['files', bucketId, currentPath],
+  const { data: allData = { files: [], folders: [], nextMarker: null, isTruncated: false }, isLoading } = useQuery({
+    queryKey: ['files', bucketId, currentPath, markers[page - 1]],
     queryFn: async () => {
-      const res = await fetch(`/api/files?bucketId=${bucketId}&prefix=${currentPath}`)
+      const marker = markers[page - 1] || ''
+      const res = await fetch(`/api/files?bucketId=${bucketId}&prefix=${currentPath}&marker=${marker}&maxKeys=${pageSize}`)
       if (!res.ok) throw new Error('Failed to fetch files')
       const data = await res.json()
       
@@ -130,20 +145,28 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           files.push(item)
         } else if (parts.length > 1) {
           // 这是子文件夹或子文件夹中的文件
-                      const folderName = parts[0]
-            const subFolderPath = currentPath ? `${currentPath}${folderName}/` : `${folderName}/`
-            
-            if (!processedPaths.has(subFolderPath)) {
-              processedPaths.add(subFolderPath)
-              folders.push({
-                name: folderName,
-                path: subFolderPath
-              })
-            }
+          const folderName = parts[0]
+          const subFolderPath = currentPath ? `${currentPath}${folderName}/` : `${folderName}/`
+          
+          if (!processedPaths.has(subFolderPath)) {
+            processedPaths.add(subFolderPath)
+            folders.push({
+              name: folderName,
+              path: subFolderPath
+            })
+          }
         }
       })
       
-      return { files, folders }
+      // 更新分页状态
+      setHasMore(data.isTruncated || false)
+      
+      // 如果有下一页，预先存储下一页的marker
+      if (data.nextMarker && !markers.includes(data.nextMarker)) {
+        setMarkers(prev => [...prev.slice(0, page), data.nextMarker])
+      }
+      
+      return { files, folders, nextMarker: data.nextMarker, isTruncated: data.isTruncated }
     },
     // 缓存优化
     staleTime: 5 * 60 * 1000, // 5分钟内数据视为新鲜
@@ -1047,7 +1070,10 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           {searchFilters.query && files.length !== allFiles.length ? (
             <>找到 {files.length} 个文件 / 共 {allFiles.length} 个</>
           ) : (
-            <>共 {files.length} 个文件</>
+            <>
+              共 {files.length} 个文件
+              {hasMore && ` (第 ${page} 页)`}
+            </>
           )}
         </div>
       </div>
@@ -1088,6 +1114,36 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           formatFileSize={formatFileSize}
           formatDate={formatDate}
         />
+      )}
+      
+      {/* 分页控件 */}
+      {(hasMore || page > 1) && (
+        <div className="flex items-center justify-center gap-4 mt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+            disabled={page === 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            上一页
+          </Button>
+          
+          <div className="text-sm text-muted-foreground">
+            第 {page} 页
+            {hasMore && " / ..."}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(prev => prev + 1)}
+            disabled={!hasMore}
+          >
+            下一页
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
       )}
       
       {/* 删除确认对话框 */}
