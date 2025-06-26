@@ -6,6 +6,11 @@ import { writeFileSync } from 'fs'
 import { join } from 'path'
 import crypto from 'crypto'
 
+interface ExtendedInitializeFormData extends InitializeFormData {
+  port?: string
+  domain?: string
+}
+
 export async function GET() {
   try {
     const status = await initializeDatabase()
@@ -32,7 +37,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: InitializeFormData = await request.json()
+    const body: ExtendedInitializeFormData = await request.json()
     
     // 验证输入
     if (!body.username || !body.password || !body.confirmPassword) {
@@ -68,8 +73,18 @@ export async function POST(request: NextRequest) {
     // 如果没有环境变量，生成.env.local文件
     if (!process.env.NEXTAUTH_SECRET || !process.env.ENCRYPTION_KEY) {
       try {
+        // 构建NEXTAUTH_URL
+        let nextAuthUrl = 'http://localhost:3000'
+        if (body.domain) {
+          // 如果用户提供了域名，使用域名
+          nextAuthUrl = body.domain.startsWith('http') ? body.domain : `https://${body.domain}`
+        } else if (body.port && body.port !== '3000') {
+          // 如果用户提供了非默认端口，使用该端口
+          nextAuthUrl = `http://localhost:${body.port}`
+        }
+        
         const envContent = `# NextAuth配置
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=${nextAuthUrl}
 NEXTAUTH_SECRET=${crypto.randomBytes(32).toString('base64')}
 
 # 数据库配置
@@ -77,6 +92,9 @@ DATABASE_URL="file:./prisma/dev.db"
 
 # 加密密钥（用于加密存储桶密钥）
 ENCRYPTION_KEY=${crypto.randomBytes(32).toString('base64')}
+
+# 运行端口（如果使用非默认端口）
+${body.port && body.port !== '3000' ? `PORT=${body.port}` : '# PORT=3000'}
 `
         
         const envPath = join(process.cwd(), '.env.local')

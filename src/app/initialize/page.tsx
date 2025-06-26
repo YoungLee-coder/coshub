@@ -10,16 +10,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { InitializeFormData } from '@/types'
-import { AlertCircle, CheckCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle, Info } from 'lucide-react'
 
 const initializeSchema = z.object({
   username: z.string().min(3, '用户名至少3个字符'),
   password: z.string().min(6, '密码至少6个字符'),
-  confirmPassword: z.string()
+  confirmPassword: z.string(),
+  port: z.string().optional(),
+  domain: z.string().optional()
 }).refine((data) => data.password === data.confirmPassword, {
   message: '两次输入的密码不一致',
   path: ['confirmPassword'],
 })
+
+interface ExtendedInitializeFormData extends InitializeFormData {
+  port?: string
+  domain?: string
+}
 
 export default function InitializePage() {
   const router = useRouter()
@@ -31,9 +38,17 @@ export default function InitializePage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<InitializeFormData>({
+    watch
+  } = useForm<ExtendedInitializeFormData>({
     resolver: zodResolver(initializeSchema),
+    defaultValues: {
+      port: '3000',
+      domain: ''
+    }
   })
+  
+  const port = watch('port')
+  const domain = watch('domain')
   
   // 检查环境配置状态
   useEffect(() => {
@@ -53,7 +68,7 @@ export default function InitializePage() {
     checkStatus()
   }, [])
   
-  const onSubmit = async (data: InitializeFormData) => {
+  const onSubmit = async (data: ExtendedInitializeFormData) => {
     setIsLoading(true)
     setError('')
     
@@ -105,7 +120,7 @@ export default function InitializePage() {
               <p className="text-sm font-medium mb-2">请按以下步骤操作：</p>
               <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
                 <li>在终端中按 <kbd className="bg-primary/10 px-1 py-0.5 rounded text-xs">Ctrl+C</kbd> 停止服务器</li>
-                <li>运行 <code className="bg-primary/10 px-1 py-0.5 rounded text-xs">pnpm dev</code> 重新启动</li>
+                <li>运行 <code className="bg-primary/10 px-1 py-0.5 rounded text-xs">pnpm dev</code> 或 <code className="bg-primary/10 px-1 py-0.5 rounded text-xs">pnpm start</code> 重新启动</li>
                 <li>刷新此页面继续初始化</li>
               </ol>
             </div>
@@ -162,6 +177,48 @@ export default function InitializePage() {
               />
               {errors.confirmPassword && (
                 <p className="text-sm text-destructive mt-1">{errors.confirmPassword.message}</p>
+              )}
+            </div>
+            
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Info className="h-4 w-4" />
+                <span>高级配置（可选）</span>
+              </div>
+              
+              <div>
+                <Label htmlFor="port">运行端口</Label>
+                <Input
+                  id="port"
+                  type="text"
+                  placeholder="3000"
+                  {...register('port')}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  应用运行的端口号，默认为 3000
+                </p>
+              </div>
+              
+              <div>
+                <Label htmlFor="domain">访问域名（可选）</Label>
+                <Input
+                  id="domain"
+                  type="text"
+                  placeholder="例如：https://coshub.example.com"
+                  {...register('domain')}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  如果使用自定义域名或反向代理，请填写完整的访问地址
+                </p>
+              </div>
+              
+              {(port !== '3000' || domain) && (
+                <div className="bg-muted p-3 rounded-md text-xs space-y-1">
+                  <p className="font-medium">将使用以下配置：</p>
+                  <p className="font-mono text-muted-foreground">
+                    NEXTAUTH_URL={domain || `http://localhost:${port || '3000'}`}
+                  </p>
+                </div>
               )}
             </div>
             

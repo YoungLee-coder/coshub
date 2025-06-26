@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { 
   Home, 
@@ -31,9 +31,23 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' })
+    try {
+      // 使用相对路径，避免硬编码域名
+      const data = await signOut({ 
+        redirect: false,
+        callbackUrl: '/login' 
+      })
+      
+      // 手动处理重定向，确保使用正确的路径
+      router.push(data.url || '/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+      // 如果退出失败，仍然重定向到登录页
+      router.push('/login')
+    }
   }
   
   return (

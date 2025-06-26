@@ -18,8 +18,16 @@ export async function middleware(req: NextRequest) {
   
   // 检查初始化状态
   try {
-    const initCheckUrl = new URL('/api/auth/initialize', req.url)
-    const initResponse = await fetch(initCheckUrl.toString())
+    // 使用相对路径构建URL，确保在任何环境下都能正确访问
+    const protocol = req.headers.get('x-forwarded-proto') || 'http'
+    const host = req.headers.get('host') || 'localhost:3000'
+    const initCheckUrl = `${protocol}://${host}/api/auth/initialize`
+    
+    const initResponse = await fetch(initCheckUrl, {
+      headers: {
+        'cookie': req.headers.get('cookie') || '',
+      },
+    })
     
     if (initResponse.ok) {
       const data = await initResponse.json()
@@ -35,8 +43,12 @@ export async function middleware(req: NextRequest) {
       }
     }
   } catch (error) {
-    // 如果检查失败，允许继续（让页面处理错误）
+    // 如果检查失败，让页面处理错误
     console.error('Failed to check initialization status:', error)
+    // 在检查失败的情况下，如果访问根路径，也尝试重定向到初始化页面
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/initialize', req.url))
+    }
   }
   
   // 对于需要认证的路由，使用 withAuth

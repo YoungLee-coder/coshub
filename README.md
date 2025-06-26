@@ -151,6 +151,37 @@ pnpm start
 
 ## 🌐 部署指南
 
+### 自定义端口运行
+
+如果您需要在非默认端口（3000）运行应用，请按以下步骤操作：
+
+#### 开发环境
+```bash
+# 使用自定义端口启动
+PORT=8080 pnpm dev
+```
+
+#### 生产环境
+```bash
+# 构建项目
+pnpm build
+
+# 使用自定义端口启动
+PORT=8080 pnpm start
+```
+
+#### 注意事项
+1. **首次初始化时**：在初始化页面的"高级配置"中填写正确的端口号
+2. **已初始化的项目**：需要手动修改 `.env.local` 文件中的配置：
+   ```env
+   NEXTAUTH_URL=http://localhost:8080  # 修改为您的端口
+   PORT=8080  # 添加端口配置
+   ```
+3. **使用反向代理或自定义域名**：在初始化时填写完整的访问地址，或修改 `.env.local`：
+   ```env
+   NEXTAUTH_URL=https://coshub.example.com
+   ```
+
 ### Vercel 部署（推荐）
 
 1. Fork 本仓库到您的 GitHub 账号
@@ -187,6 +218,57 @@ pnpm build
 # 启动生产服务器
 pnpm start
 ```
+
+### 重置应用
+
+如果需要完全重置应用，请删除以下文件和目录：
+
+#### Linux/macOS：
+
+1. **数据库文件**：
+   ```bash
+   rm -rf prisma/dev.db*
+   ```
+
+2. **环境配置文件**：
+   ```bash
+   rm .env.local
+   ```
+
+3. **缓存和临时文件**（可选）：
+   ```bash
+   rm -rf .next/
+   rm -rf node_modules/.cache/
+   ```
+
+#### Windows：
+
+1. **数据库文件**：
+   ```powershell
+   Remove-Item -Path "prisma\dev.db*" -Force -ErrorAction SilentlyContinue
+   ```
+
+2. **环境配置文件**：
+   ```powershell
+   Remove-Item -Path ".env.local" -Force -ErrorAction SilentlyContinue
+   ```
+
+3. **缓存和临时文件**（可选）：
+   ```powershell
+   Remove-Item -Path ".next\" -Recurse -Force -ErrorAction SilentlyContinue
+   Remove-Item -Path "node_modules\.cache\" -Recurse -Force -ErrorAction SilentlyContinue
+   ```
+
+4. **重新初始化**：
+   ```bash
+   # 重新安装依赖（可选）
+   pnpm install
+   
+   # 启动应用
+   pnpm dev
+   ```
+
+删除这些文件后，再次访问应用时会自动跳转到初始化页面，您可以重新设置管理员账号和配置。
 
 ## 📖 使用说明
 
