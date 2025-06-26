@@ -1,15 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { initializeDatabase, prisma } from '@/lib/db'
-import { createInitialUser } from '@/lib/auth'
-import { InitializeFormData } from '@/types'
-import { writeFileSync } from 'fs'
-import { join } from 'path'
-import crypto from 'crypto'
-
-interface ExtendedInitializeFormData extends InitializeFormData {
-  port?: string
-  domain?: string
-}
+import { NextResponse } from 'next/server'
+import { initializeDatabase } from '@/lib/db'
 
 export async function GET() {
   try {
@@ -30,98 +20,6 @@ export async function GET() {
     console.error('Failed to check initialization status:', error)
     return NextResponse.json(
       { error: '检查初始化状态失败' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const body: ExtendedInitializeFormData = await request.json()
-    
-    // 验证输入
-    if (!body.username || !body.password || !body.confirmPassword) {
-      return NextResponse.json(
-        { error: '请填写所有字段' },
-        { status: 400 }
-      )
-    }
-    
-    if (body.password !== body.confirmPassword) {
-      return NextResponse.json(
-        { error: '两次输入的密码不一致' },
-        { status: 400 }
-      )
-    }
-    
-    if (body.password.length < 6) {
-      return NextResponse.json(
-        { error: '密码长度至少为6位' },
-        { status: 400 }
-      )
-    }
-    
-    // 检查是否已初始化
-    const userCount = await prisma.user.count()
-    if (userCount > 0) {
-      return NextResponse.json(
-        { error: '系统已初始化' },
-        { status: 400 }
-      )
-    }
-    
-    // 如果没有环境变量，生成.env.local文件
-    if (!process.env.NEXTAUTH_SECRET || !process.env.ENCRYPTION_KEY) {
-      try {
-        // 构建NEXTAUTH_URL
-        let nextAuthUrl = 'http://localhost:3000'
-        if (body.domain) {
-          // 如果用户提供了域名，使用域名
-          nextAuthUrl = body.domain.startsWith('http') ? body.domain : `https://${body.domain}`
-        } else if (body.port && body.port !== '3000') {
-          // 如果用户提供了非默认端口，使用该端口
-          nextAuthUrl = `http://localhost:${body.port}`
-        }
-        
-        const envContent = `# NextAuth配置
-NEXTAUTH_URL=${nextAuthUrl}
-NEXTAUTH_SECRET=${crypto.randomBytes(32).toString('base64')}
-
-# 数据库配置
-DATABASE_URL="file:./prisma/dev.db"
-
-# 加密密钥（用于加密存储桶密钥）
-ENCRYPTION_KEY=${crypto.randomBytes(32).toString('base64')}
-
-# 运行端口（如果使用非默认端口）
-${body.port && body.port !== '3000' ? `PORT=${body.port}` : '# PORT=3000'}
-`
-        
-        const envPath = join(process.cwd(), '.env.local')
-        writeFileSync(envPath, envContent, 'utf8')
-        
-        return NextResponse.json({ 
-          success: false,
-          needRestart: true,
-          message: '环境配置文件已创建，请重启服务器以应用配置' 
-        })
-      } catch (error) {
-        console.error('Failed to create .env.local:', error)
-        return NextResponse.json(
-          { error: '创建环境配置文件失败' },
-          { status: 500 }
-        )
-      }
-    }
-    
-    // 创建初始用户
-    await createInitialUser(body.username, body.password)
-    
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Initialize error:', error)
-    return NextResponse.json(
-      { error: '初始化失败' },
       { status: 500 }
     )
   }

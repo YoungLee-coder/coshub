@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Edit, Trash2, Grid3x3, List, HardDrive, RefreshCw } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Plus, Edit, Trash2, Grid3x3, List, HardDrive, RefreshCw, User, Key } from 'lucide-react'
 import { BucketDialog } from '@/components/BucketDialog'
 import { BucketWithStats } from '@/types'
 import { useToast } from '@/hooks/use-toast'
 import { usePreferences } from '@/stores/preferences'
 import { getCacheSize, clearAllCache } from '@/lib/cache'
+import { useSession, signOut } from 'next-auth/react'
 
 export default function SettingsPage() {
   const [isAddingBucket, setIsAddingBucket] = useState(false)
@@ -19,6 +22,17 @@ export default function SettingsPage() {
   const { viewMode, setViewMode } = usePreferences()
   const [cacheSize, setCacheSize] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const { data: session } = useSession()
+  
+  // 用户名修改相关状态
+  const [newUsername, setNewUsername] = useState('')
+  const [isChangingUsername, setIsChangingUsername] = useState(false)
+  
+  // 密码修改相关状态
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
   
   const { data: buckets, isLoading: bucketsLoading } = useQuery({
     queryKey: ['buckets'],
@@ -102,6 +116,125 @@ export default function SettingsPage() {
     }
   }
 
+  // 修改用户名
+  const handleChangeUsername = async () => {
+    if (!newUsername.trim()) {
+      toast({
+        title: '用户名不能为空',
+        description: '请输入新的用户名',
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    if (newUsername.length < 3) {
+      toast({
+        title: '用户名太短',
+        description: '用户名长度至少为3位',
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    setIsChangingUsername(true)
+    try {
+      const res = await fetch('/api/user/username', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newUsername: newUsername.trim(),
+        })
+      })
+      
+      const data = await res.json()
+      
+      if (!res.ok) {
+        throw new Error(data.error || '修改用户名失败')
+      }
+      
+      toast({
+        title: '用户名已修改',
+        description: '请使用新用户名重新登录',
+      })
+      
+      // 延迟一下让用户看到提示
+      setTimeout(() => {
+        signOut({ callbackUrl: '/login' })
+      }, 1500)
+      
+    } catch (error) {
+      toast({
+        title: '修改失败',
+        description: error instanceof Error ? error.message : '修改用户名失败',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsChangingUsername(false)
+    }
+  }
+
+  // 修改密码
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: '密码不匹配',
+        description: '两次输入的密码不一致',
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    if (newPassword.length < 6) {
+      toast({
+        title: '密码太短',
+        description: '密码长度至少为6位',
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    setIsChangingPassword(true)
+    try {
+      const res = await fetch('/api/user/password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        })
+      })
+      
+      const data = await res.json()
+      
+      if (!res.ok) {
+        throw new Error(data.error || '修改密码失败')
+      }
+      
+      toast({
+        title: '密码已修改',
+        description: '请使用新密码重新登录',
+      })
+      
+      // 延迟一下让用户看到提示
+      setTimeout(() => {
+        signOut({ callbackUrl: '/login' })
+      }, 1500)
+      
+    } catch (error) {
+      toast({
+        title: '修改失败',
+        description: error instanceof Error ? error.message : '修改密码失败',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
   // 格式化文件大小
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 B'
@@ -119,6 +252,122 @@ export default function SettingsPage() {
       </div>
       
       <div className="space-y-8">
+        {/* 账号管理 */}
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                账号管理
+              </CardTitle>
+              <CardDescription>
+                管理您的账号信息和安全设置
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-6 divide-y md:divide-y-0 md:divide-x">
+                {/* 左侧：用户信息和修改用户名 */}
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="font-medium mb-4 flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      用户信息
+                    </h4>
+                    
+                    <div className="space-y-4">
+                      <div className="bg-muted/50 rounded-lg p-4">
+                        <Label className="text-sm text-muted-foreground">当前用户名</Label>
+                        <p className="text-lg font-medium mt-1">{session?.user?.name || 'admin'}</p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="new-username">新用户名</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="new-username"
+                            type="text"
+                            value={newUsername}
+                            onChange={(e) => setNewUsername(e.target.value)}
+                            placeholder="至少3位字符"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newUsername.trim()) {
+                                handleChangeUsername()
+                              }
+                            }}
+                          />
+                          <Button 
+                            onClick={handleChangeUsername}
+                            disabled={isChangingUsername || !newUsername.trim()}
+                            className="shrink-0"
+                          >
+                            {isChangingUsername ? '修改中...' : '修改'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 右侧：修改密码 */}
+                <div className="pt-6 md:pt-0 md:pl-6">
+                  <h4 className="font-medium mb-4 flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    安全设置
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="current-password">当前密码</Label>
+                      <Input
+                        id="current-password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="请输入当前密码"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="new-password">新密码</Label>
+                      <Input
+                        id="new-password"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="至少6位字符"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="confirm-password">确认新密码</Label>
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="请再次输入新密码"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && currentPassword && newPassword && confirmPassword) {
+                            handleChangePassword()
+                          }
+                        }}
+                      />
+                    </div>
+                    
+                    <Button 
+                      onClick={handleChangePassword}
+                      disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                      className="w-full"
+                    >
+                      {isChangingPassword ? '修改中...' : '修改密码'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
         {/* 存储桶管理 */}
         <div>
           <div className="flex items-center justify-between mb-6">

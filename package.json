@@ -1,16 +1,18 @@
 {
   "name": "coshub",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/init.js && next dev -p 5030",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/init.js && next start -p 5030",
+    "start:custom": "node scripts/init.js && next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "init": "node scripts/init.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -37,6 +39,7 @@
     "clsx": "^2.1.1",
     "cos-nodejs-sdk-v5": "^2.14.3",
     "date-fns": "^4.1.0",
+    "dotenv": "^16.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.469.0",
     "next": "15.3.4",
