@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Download, ExternalLink } from 'lucide-react'
 import { FileWithUrl } from '@/types'
-import { getPreviewParams } from '@/lib/config'
 
 // 工具函数
 function formatFileSize(bytes: number): string {
@@ -49,18 +48,8 @@ export function ThumbnailViewer({ file, open, onOpenChange }: ThumbnailViewerPro
   
   const isImage = getFileType(file.name) === 'image'
   const isVideo = getFileType(file.name) === 'video'
-  const hasPreview = isImage || isVideo || file.thumbnailUrl
+  const hasPreview = isImage || isVideo
   
-  // 为预览图片生成优化的 URL
-  const getOptimizedImageUrl = (url: string) => {
-    // 如果是 COS URL，添加图片处理参数
-    if (url.includes('.myqcloud.com/') || url.includes('.cos.')) {
-      const separator = url.includes('?') ? '&' : '?'
-      return `${url}${separator}${getPreviewParams()}`
-    }
-    return url
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
@@ -74,16 +63,20 @@ export function ThumbnailViewer({ file, open, onOpenChange }: ThumbnailViewerPro
             <div className="bg-secondary rounded-lg p-4 flex items-center justify-center min-h-[400px]">
               {isImage ? (
                 <img
-                  src={getOptimizedImageUrl(file.thumbnailUrl || file.url)}
+                  src={file.url}
                   alt={file.name}
                   className="max-w-full max-h-[500px] object-contain rounded"
+                  loading="eager"
                 />
-              ) : isVideo && file.thumbnailUrl ? (
-                <img
-                  src={getOptimizedImageUrl(file.thumbnailUrl)}
-                  alt={`${file.name} 预览`}
-                  className="max-w-full max-h-[500px] object-contain rounded"
-                />
+              ) : isVideo ? (
+                <video
+                  src={file.url}
+                  controls
+                  className="max-w-full max-h-[500px] rounded"
+                  poster={file.thumbnailUrl || undefined}
+                >
+                  您的浏览器不支持视频播放
+                </video>
               ) : (
                 <div className="text-center text-muted-foreground">
                   <p>无法预览此文件类型</p>

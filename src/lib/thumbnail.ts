@@ -15,7 +15,10 @@ const SUPPORTED_IMAGE_FORMATS = [
   'image/webp',
   'image/gif',
   'image/bmp',
-  'image/tiff'
+  'image/tiff',
+  'image/svg+xml',
+  'image/x-icon',
+  'image/vnd.microsoft.icon'
 ]
 
 // 生成图片缩略图
@@ -98,7 +101,12 @@ export function generateThumbnailUrl(
   const baseUrl = getFileUrl(bucket, region, key, customDomain)
   
   // 对于图片，使用COS的图片处理功能生成缩略图
-  if (isImageFile(filename) && mimeType && SUPPORTED_IMAGE_FORMATS.includes(mimeType)) {
+  // 如果没有mimeType，仅基于文件扩展名判断
+  if (isImageFile(filename)) {
+    // 如果有mimeType，检查是否在支持列表中
+    if (mimeType && !SUPPORTED_IMAGE_FORMATS.includes(mimeType)) {
+      return null
+    }
     // 使用COS的图片处理功能生成缩略图
     // 参考：https://cloud.tencent.com/document/product/436/54050
     return `${baseUrl}?imageMogr2/thumbnail/${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}/quality/${THUMBNAIL_QUALITY}`

@@ -407,58 +407,137 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     setSelectedFiles(newSelected)
   }
   
-  // 获取文件图标
-  const getFileIcon = (filename: string) => {
-    if (isImageFile(filename)) return <ImageIcon className="h-4 w-4" />
-    if (isVideoFile(filename)) return <VideoIcon className="h-4 w-4" />
-    return <FileIcon className="h-4 w-4" />
-  }
+
   
   // 获取列表视图的文件预览（40x40）
   const getListFilePreview = (file: FileWithUrl) => {
-    // 如果有缩略图，显示缩略图
-    if (file.thumbnailUrl && (isImageFile(file.name) || isVideoFile(file.name))) {
-      return (
-        <div className="relative w-10 h-10 rounded overflow-hidden bg-muted">
-          <CachedImage
-            src={file.thumbnailUrl}
-            alt={file.name}
-            className="w-full h-full object-cover"
-            fallback={getFileIcon(file.name)}
-          />
-        </div>
-      )
+    // 如果是图片文件
+    if (isImageFile(file.name)) {
+      // 使用缩略图URL，如果没有则为原始URL添加图片处理参数
+      let imageUrl = file.thumbnailUrl
+      
+      if (!imageUrl && file.url) {
+        // 为图片URL添加COS图片处理参数生成缩略图
+        const separator = file.url.includes('?') ? '&' : '?'
+        imageUrl = `${file.url}${separator}imageMogr2/thumbnail/100x100/quality/85`
+      }
+      
+      if (imageUrl) {
+        return (
+          <div className="relative w-10 h-10 rounded overflow-hidden bg-muted">
+            <CachedImage
+              src={imageUrl}
+              alt={file.name}
+              className="w-full h-full object-cover"
+              fallback={
+                <div className="w-full h-full flex items-center justify-center">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                </div>
+              }
+            />
+          </div>
+        )
+      }
+    } else if (isVideoFile(file.name)) {
+      // 视频文件尝试显示截帧
+      let videoThumbnailUrl = file.thumbnailUrl
+      
+      if (!videoThumbnailUrl && file.url) {
+        // 为视频URL添加COS视频截帧参数
+        const separator = file.url.includes('?') ? '&' : '?'
+        videoThumbnailUrl = `${file.url}${separator}ci-process=snapshot&time=1&width=100&height=100&format=jpg`
+      }
+      
+      if (videoThumbnailUrl) {
+        return (
+          <div className="relative w-10 h-10 rounded overflow-hidden bg-muted">
+            <CachedImage
+              src={videoThumbnailUrl}
+              alt={file.name}
+              className="w-full h-full object-cover"
+              fallback={
+                <div className="w-full h-full flex items-center justify-center">
+                  <VideoIcon className="h-4 w-4 text-muted-foreground" />
+                </div>
+              }
+            />
+          </div>
+        )
+      }
+      
+      return <div className="w-10 h-10 flex items-center justify-center bg-muted rounded">
+        <VideoIcon className="h-4 w-4 text-muted-foreground" />
+      </div>
     }
     
-    // 否则显示图标
+    // 其他文件显示文件图标
     return <div className="w-10 h-10 flex items-center justify-center bg-muted rounded">
-      {getFileIcon(file.name)}
+      <FileIcon className="h-4 w-4 text-muted-foreground" />
     </div>
   }
   
   // 获取文件图标或缩略图（用于网格视图）
   const getFilePreview = (file: FileWithUrl) => {
-    // 如果有缩略图，显示缩略图
-    if (file.thumbnailUrl && (isImageFile(file.name) || isVideoFile(file.name))) {
-      return (
-        <div className="relative w-full h-full rounded overflow-hidden bg-muted">
-          <CachedImage
-            src={file.thumbnailUrl}
-            alt={file.name}
-            className="w-full h-full object-cover"
-            fallback={
-              <div className="w-full h-full flex items-center justify-center">
-                {getFileIcon(file.name)}
-              </div>
-            }
-          />
-        </div>
-      )
+    // 如果是图片文件
+    if (isImageFile(file.name)) {
+      // 使用缩略图URL，如果没有则为原始URL添加图片处理参数
+      let imageUrl = file.thumbnailUrl
+      
+      if (!imageUrl && file.url) {
+        // 为图片URL添加COS图片处理参数生成缩略图
+        const separator = file.url.includes('?') ? '&' : '?'
+        imageUrl = `${file.url}${separator}imageMogr2/thumbnail/200x200/quality/85`
+      }
+      
+      if (imageUrl) {
+        return (
+          <div className="relative w-full h-full rounded overflow-hidden bg-muted">
+            <CachedImage
+              src={imageUrl}
+              alt={file.name}
+              className="w-full h-full object-cover"
+              fallback={
+                <div className="w-full h-full flex items-center justify-center">
+                  <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                </div>
+              }
+            />
+          </div>
+        )
+      }
+    } else if (isVideoFile(file.name)) {
+      // 视频文件尝试显示截帧
+      let videoThumbnailUrl = file.thumbnailUrl
+      
+      if (!videoThumbnailUrl && file.url) {
+        // 为视频URL添加COS视频截帧参数
+        const separator = file.url.includes('?') ? '&' : '?'
+        videoThumbnailUrl = `${file.url}${separator}ci-process=snapshot&time=1&width=200&height=200&format=jpg`
+      }
+      
+      if (videoThumbnailUrl) {
+        return (
+          <div className="relative w-full h-full rounded overflow-hidden bg-muted">
+            <CachedImage
+              src={videoThumbnailUrl}
+              alt={file.name}
+              className="w-full h-full object-cover"
+              fallback={
+                <div className="w-full h-full flex items-center justify-center">
+                  <VideoIcon className="h-8 w-8 text-muted-foreground" />
+                </div>
+              }
+            />
+          </div>
+        )
+      }
     }
     
-    // 否则显示图标
-    const IconComponent = isImageFile(file.name) ? ImageIcon : isVideoFile(file.name) ? VideoIcon : FileIcon
-    return <IconComponent className="h-8 w-8 text-muted-foreground" />
+    // 视频和其他文件显示相应图标
+    const IconComponent = isVideoFile(file.name) ? VideoIcon : FileIcon
+    return <div className="w-full h-full flex items-center justify-center">
+      <IconComponent className="h-8 w-8 text-muted-foreground" />
+    </div>
   }
   
   // 批量删除优化
@@ -502,11 +581,16 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       setSelectedFiles(new Set())
     } catch (error) {
       toast({
-        title: '删除失败',
-        description: error instanceof Error ? error.message : '批量删除过程中出现错误',
+        title: '批量删除失败',
+        description: error instanceof Error ? error.message : '删除文件时出现错误',
         variant: 'destructive',
       })
     }
+  }
+  
+  // 处理文件预览
+  const handlePreview = (file: FileWithUrl) => {
+    setPreviewFile(file)
   }
   
   // 批量下载
@@ -630,8 +714,6 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     }
   }
   
-
-  
   // 创建文件夹
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) {
@@ -714,8 +796,6 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   }
   
   const breadcrumbs = getBreadcrumbs()
-  
-
   
   // 复制文件链接
   const handleCopyLink = (file: FileWithUrl) => {
@@ -986,7 +1066,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           selectedFiles={selectedFiles}
           onSelectFile={handleSelectFile}
           onSelectAll={handleSelectAll}
-          onPreviewFile={setPreviewFile}
+          onPreviewFile={handlePreview}
           onDeleteFile={(id) => setDeleteFileId(id)}
           onNavigateToFolder={navigateToFolder}
           onCopyLink={handleCopyLink}
@@ -1000,7 +1080,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           folders={searchFilters.query.trim() ? [] : allFolders}
           selectedFiles={selectedFiles}
           onSelectFile={handleSelectFile}
-          onPreviewFile={setPreviewFile}
+          onPreviewFile={handlePreview}
           onDeleteFile={(id) => setDeleteFileId(id)}
           onNavigateToFolder={navigateToFolder}
           onCopyLink={handleCopyLink}
