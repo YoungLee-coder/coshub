@@ -446,6 +446,18 @@ PORT=8080 pnpm start
 ### Windows 下的权限问题
 在 Windows 下如果遇到权限问题，请以管理员身份运行 PowerShell。
 
+### 服务器部署注意事项
+部署到服务器时，确保正确配置 `NEXTAUTH_URL`：
+```bash
+# 编辑 .env.local
+NEXTAUTH_URL=http://你的服务器IP:5030
+```
+
+### JWT 会话错误
+如果看到 `JWT_SESSION_ERROR`，这通常是因为更换了 `NEXTAUTH_SECRET`。解决方法：
+1. 清除浏览器 Cookie
+2. 重新登录即可
+
 ## 🤝 贡献指南
 
 欢迎贡献代码和提出建议！

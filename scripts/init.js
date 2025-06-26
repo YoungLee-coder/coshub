@@ -44,7 +44,16 @@ async function initializeApp() {
       
       // 使用端口 5030 作为默认端口
       const port = '5030'
-      const nextAuthUrl = process.env.NEXTAUTH_URL || `http://localhost:${port}`
+      
+      // 尝试自动检测访问地址
+      let nextAuthUrl = process.env.NEXTAUTH_URL
+      if (!nextAuthUrl) {
+        // 如果有环境变量指定，使用环境变量
+        const host = process.env.HOST || getLocalIP()
+        nextAuthUrl = `http://${host}:${port}`
+        console.log(`📌 自动检测访问地址: ${nextAuthUrl}`)
+        console.log('   如需使用其他地址，请设置 NEXTAUTH_URL 环境变量')
+      }
       
       const envContent = `# NextAuth配置
 NEXTAUTH_URL=${nextAuthUrl}

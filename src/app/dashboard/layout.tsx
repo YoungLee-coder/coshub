@@ -35,14 +35,13 @@ export default function DashboardLayout({
   
   const handleLogout = async () => {
     try {
-      // 使用相对路径，避免硬编码域名
-      const data = await signOut({ 
-        redirect: false,
-        callbackUrl: '/login' 
+      // 使用相对路径退出登录
+      await signOut({ 
+        redirect: false 
       })
       
-      // 手动处理重定向，确保使用正确的路径
-      router.push(data.url || '/login')
+      // 使用 router.push 确保在同一域名下跳转
+      router.push('/login')
     } catch (error) {
       console.error('Logout error:', error)
       // 如果退出失败，仍然重定向到登录页

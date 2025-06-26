@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast'
 import { usePreferences } from '@/stores/preferences'
 import { getCacheSize, clearAllCache } from '@/lib/cache'
 import { useSession, signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
 export default function SettingsPage() {
   const [isAddingBucket, setIsAddingBucket] = useState(false)
@@ -23,6 +24,7 @@ export default function SettingsPage() {
   const [cacheSize, setCacheSize] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const { data: session } = useSession()
+  const router = useRouter()
   
   // 用户名修改相关状态
   const [newUsername, setNewUsername] = useState('')
@@ -160,8 +162,9 @@ export default function SettingsPage() {
       })
       
       // 延迟一下让用户看到提示
-      setTimeout(() => {
-        signOut({ callbackUrl: '/login' })
+      setTimeout(async () => {
+        await signOut({ redirect: false })
+        router.push('/login')
       }, 1500)
       
     } catch (error) {
@@ -220,8 +223,9 @@ export default function SettingsPage() {
       })
       
       // 延迟一下让用户看到提示
-      setTimeout(() => {
-        signOut({ callbackUrl: '/login' })
+      setTimeout(async () => {
+        await signOut({ redirect: false })
+        router.push('/login')
       }, 1500)
       
     } catch (error) {
