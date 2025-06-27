@@ -32,10 +32,10 @@ const bucketSchema = z.object({
   isDefault: z.boolean().optional(),
 })
 
-// 编辑模式的 schema，SecretId 和 SecretKey 是可选的
+// 编辑模式的 schema，所有字段都是可选的
 const editBucketSchema = z.object({
-  name: z.string().min(3, '存储桶名称至少3个字符').regex(/^[a-z0-9-]+$/, '只能包含小写字母、数字和横线'),
-  region: z.string().min(1, '请选择地域'),
+  name: z.string().optional(),
+  region: z.string().optional(),
   secretId: z.string().optional(),
   secretKey: z.string().optional(),
   customDomain: z.string().transform((val) => {
@@ -117,10 +117,26 @@ export function BucketDialog({ open, onOpenChange, bucket, onSuccess }: BucketDi
     setIsLoading(true)
     
     try {
+      // 编辑模式下，只发送有值的字段
+      const submitData: Partial<BucketFormData> = isEdit ? {} : data
+      
+      if (isEdit) {
+        // 编辑模式：只包含修改的字段
+        submitData.customDomain = data.customDomain
+        submitData.description = data.description
+        submitData.isDefault = data.isDefault
+        
+        // 只有当密钥字段有值时才包含它们
+        if (data.secretId && data.secretKey) {
+          submitData.secretId = data.secretId
+          submitData.secretKey = data.secretKey
+        }
+      }
+      
       const res = await fetch(`/api/buckets${isEdit ? `/${bucket.id}` : ''}`, {
         method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(isEdit ? submitData : data),
       })
       
       const result = await res.json()

@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { encrypt, decrypt } from '@/lib/utils'
+import { encrypt } from '@/lib/utils'
 import { BucketFormData } from '@/types'
-import { createCosInstance } from '@/lib/cos'
 
 // 获取存储桶列表
 export async function GET() {
@@ -16,81 +15,21 @@ export async function GET() {
   
   try {
     const buckets = await prisma.bucket.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: { files: true }
+        }
+      }
     })
     
-    // 构建响应数据，包含统计信息
-    const bucketsWithStats = await Promise.all(
-      buckets.map(async (bucket) => {
-        try {
-          // 创建COS实例
-          const cos = createCosInstance({
-            secretId: bucket.secretId,
-            secretKey: decrypt(bucket.secretKey),
-            region: bucket.region,
-            bucket: bucket.name,
-            customDomain: bucket.customDomain || undefined
-          })
-          
-          // 从COS获取文件统计信息
-          let fileCount = 0
-          let totalSize = 0
-          let marker = ''
-          let isTruncated = true
-          
-          // 循环获取所有文件（处理分页）
-          while (isTruncated) {
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const result = await new Promise<any>((resolve, reject) => {
-              cos.getBucket({
-                Bucket: bucket.name,
-                Region: bucket.region,
-                Marker: marker,
-                MaxKeys: 1000,
-              }, (err, data) => {
-                if (err) {
-                  console.error(`Failed to get bucket stats for ${bucket.name}:`, err)
-                  reject(err)
-                  return
-                }
-                resolve(data)
-              })
-            })
-            
-            // 统计文件数量和大小（排除文件夹）
-            if (result.Contents) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              result.Contents.forEach((item: any) => {
-                // 排除文件夹（以/结尾）
-                if (!item.Key.endsWith('/')) {
-                  fileCount++
-                  totalSize += parseInt(item.Size || '0')
-                }
-              })
-            }
-            
-            marker = result.NextMarker || ''
-            isTruncated = result.IsTruncated || false
-          }
-          
-          return {
-            ...bucket,
-            secretKey: undefined, // 不返回密钥
-            fileCount,
-            totalSize
-          } as Omit<typeof bucket, 'secretKey'> & { fileCount: number; totalSize: number }
-        } catch (error) {
-          console.error(`Failed to get stats for bucket ${bucket.name}:`, error)
-          // 如果获取失败，返回默认值
-          return {
-            ...bucket,
-            secretKey: undefined,
-            fileCount: 0,
-            totalSize: 0
-          } as Omit<typeof bucket, 'secretKey'> & { fileCount: number; totalSize: number }
-        }
-      })
-    )
+    // 构建响应数据，使用数据库中的文件数量
+    const bucketsWithStats = buckets.map(bucket => ({
+      ...bucket,
+      secretKey: undefined, // 不返回密钥
+      fileCount: bucket._count.files,
+      totalSize: 0 // 暂时不计算总大小，可以后续优化
+    }))
     
     return NextResponse.json(bucketsWithStats)
   } catch (error) {

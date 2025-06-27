@@ -78,6 +78,15 @@ interface FolderItem {
   path: string
 }
 
+// 扩展的文件类型，支持文件夹标记
+interface ExtendedFileWithUrl extends FileWithUrl {
+  isFolder?: boolean
+}
+
+// 添加排序类型
+type SortField = 'name' | 'size' | 'uploadedAt'
+type SortOrder = 'asc' | 'desc'
+
 export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [deleteFileId, setDeleteFileId] = useState<string | null>(null)
@@ -95,9 +104,16 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   
+  // 添加重命名相关状态
+  const [renamingFile, setRenamingFile] = useState<FileWithUrl | null>(null)
+  const [newFileName, setNewFileName] = useState('')
+  
+  // 添加排序状态
+  const [sortField, setSortField] = useState<SortField>('uploadedAt')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  
   // 分页相关状态
   const [page, setPage] = useState(1)
-  const [pageSize] = useState(50) // 每页显示50个文件
   const [hasMore, setHasMore] = useState(false)
   const [markers, setMarkers] = useState<string[]>(['']) // 存储每页的marker，第一页为空字符串
   
@@ -105,6 +121,17 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   const queryClient = useQueryClient()
   const { viewMode, setViewMode } = usePreferences()
   const { selectedBucket } = useBucketStore()
+  
+  // 根据视图模式调整每页显示数量
+  const pageSize = useMemo(() => {
+    if (viewMode === 'grid') {
+      // 网格视图：6列 x 4行 = 24个
+      return 24
+    } else {
+      // 列表视图：保持原有的50个
+      return 50
+    }
+  }, [viewMode])
   
   // 当 selectedBucket 变化时，刷新文件列表
   useEffect(() => {
@@ -118,11 +145,11 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     setPage(1)
     setHasMore(false)
     setMarkers([''])
-  }, [bucketId, currentPath])
+  }, [bucketId, currentPath, pageSize])
   
   // 获取文件列表
   const { data: allData = { files: [], folders: [], nextMarker: null, isTruncated: false }, isLoading } = useQuery({
-    queryKey: ['files', bucketId, currentPath, markers[page - 1]],
+    queryKey: ['files', bucketId, currentPath, markers[page - 1], pageSize],
     queryFn: async () => {
       const marker = markers[page - 1] || ''
       const res = await fetch(`/api/files?bucketId=${bucketId}&prefix=${currentPath}&marker=${marker}&maxKeys=${pageSize}`)
@@ -132,38 +159,28 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       // 处理文件和文件夹
       const files: FileWithUrl[] = []
       const folders: FolderItem[] = []
-      const processedPaths = new Set<string>()
       
       // API 返回格式是 { files: [], nextMarker: null, isTruncated: false }
       const responseData = data.files || []
-      responseData.forEach((item: FileWithUrl) => {
-        const relativePath = currentPath ? item.key.slice(currentPath.length) : item.key
-        const parts = relativePath.split('/').filter(Boolean)
-        
-        if (parts.length === 1) {
-          // 这是当前目录下的文件
+      responseData.forEach((item: ExtendedFileWithUrl) => {
+        // 检查是否是文件夹
+        if (item.isFolder || item.type === 'folder') {
+          folders.push({
+            name: item.name,
+            path: item.key
+          })
+        } else {
           files.push(item)
-        } else if (parts.length > 1) {
-          // 这是子文件夹或子文件夹中的文件
-          const folderName = parts[0]
-          const subFolderPath = currentPath ? `${currentPath}${folderName}/` : `${folderName}/`
-          
-          if (!processedPaths.has(subFolderPath)) {
-            processedPaths.add(subFolderPath)
-            folders.push({
-              name: folderName,
-              path: subFolderPath
-            })
-          }
         }
       })
       
       // 更新分页状态
-      setHasMore(data.isTruncated || false)
+      const hasMoreData = data.isTruncated || false
+      setHasMore(hasMoreData)
       
       // 如果有下一页，预先存储下一页的marker
-      if (data.nextMarker && !markers.includes(data.nextMarker)) {
-        setMarkers(prev => [...prev.slice(0, page), data.nextMarker])
+      if (data.nextMarker && page === markers.length) {
+        setMarkers(prev => [...prev, data.nextMarker])
       }
       
       return { files, folders, nextMarker: data.nextMarker, isTruncated: data.isTruncated }
@@ -176,9 +193,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   
   const { files: allFiles, folders: allFolders } = allData
   
-  // 过滤文件和文件夹（文件夹不需要过滤）
-  
-  // 过滤文件列表
+  // 过滤和排序文件
   const files = useMemo(() => {
     let filtered = allFiles
     
@@ -247,8 +262,27 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       })
     }
     
-    return filtered
-  }, [allFiles, searchFilters])
+    // 排序
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0
+      
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name, 'zh-CN')
+          break
+        case 'size':
+          comparison = a.size - b.size
+          break
+        case 'uploadedAt':
+          comparison = new Date(a.uploadedAt || 0).getTime() - new Date(b.uploadedAt || 0).getTime()
+          break
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+    
+    return sorted
+  }, [allFiles, searchFilters, sortField, sortOrder])
   
   // 删除文件
   const deleteMutation = useMutation({
@@ -280,6 +314,61 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       })
     }
   })
+  
+  // 重命名文件
+  const renameMutation = useMutation({
+    mutationFn: async ({ fileId, newName }: { fileId: string; newName: string }) => {
+      const res = await fetch(`/api/files/${fileId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newName })
+      })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || '重命名失败')
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      toast({
+        title: '重命名成功',
+        description: '文件名已更新',
+      })
+      queryClient.invalidateQueries({ queryKey: ['files', bucketId, currentPath] })
+      setRenamingFile(null)
+      setNewFileName('')
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '重命名失败',
+        description: error.message,
+        variant: 'destructive',
+      })
+    }
+  })
+  
+  // 处理重命名
+  const handleRename = (file: FileWithUrl) => {
+    setRenamingFile(file)
+    setNewFileName(file.name)
+  }
+  
+  const handleConfirmRename = () => {
+    if (!renamingFile || !renamingFile.id) return
+    
+    if (!newFileName.trim()) {
+      toast({
+        title: '文件名不能为空',
+        variant: 'destructive',
+      })
+      return
+    }
+    
+    renameMutation.mutate({
+      fileId: renamingFile.id,
+      newName: newFileName.trim()
+    })
+  }
   
   // 处理文件上传
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -932,6 +1021,28 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
             </Button>
           </div>
           
+          {/* 排序选择器 */}
+          <Select
+            value={`${sortField}-${sortOrder}`}
+            onValueChange={(value) => {
+              const [field, order] = value.split('-') as [SortField, SortOrder]
+              setSortField(field)
+              setSortOrder(order)
+            }}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="uploadedAt-desc">上传时间（最新）</SelectItem>
+              <SelectItem value="uploadedAt-asc">上传时间（最早）</SelectItem>
+              <SelectItem value="name-asc">名称（A-Z）</SelectItem>
+              <SelectItem value="name-desc">名称（Z-A）</SelectItem>
+              <SelectItem value="size-asc">大小（小到大）</SelectItem>
+              <SelectItem value="size-desc">大小（大到小）</SelectItem>
+            </SelectContent>
+          </Select>
+          
           {selectedFiles.size > 0 && (
             <>
               <Button
@@ -1094,6 +1205,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           onSelectAll={handleSelectAll}
           onPreviewFile={handlePreview}
           onDeleteFile={(id) => setDeleteFileId(id)}
+          onRenameFile={handleRename}
           onNavigateToFolder={navigateToFolder}
           onCopyLink={handleCopyLink}
           getFilePreview={getListFilePreview}
@@ -1108,6 +1220,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           onSelectFile={handleSelectFile}
           onPreviewFile={handlePreview}
           onDeleteFile={(id) => setDeleteFileId(id)}
+          onRenameFile={handleRename}
           onNavigateToFolder={navigateToFolder}
           onCopyLink={handleCopyLink}
           getFilePreview={getFilePreview}
@@ -1122,7 +1235,11 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+            onClick={() => {
+              if (page > 1) {
+                setPage(prev => prev - 1)
+              }
+            }}
             disabled={page === 1}
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
@@ -1131,14 +1248,18 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           
           <div className="text-sm text-muted-foreground">
             第 {page} 页
-            {hasMore && " / ..."}
+            {!hasMore && page > 1 && ` (最后一页)`}
           </div>
           
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage(prev => prev + 1)}
-            disabled={!hasMore}
+            onClick={() => {
+              if (hasMore && markers[page]) {
+                setPage(prev => prev + 1)
+              }
+            }}
+            disabled={!hasMore || !markers[page]}
           >
             下一页
             <ChevronRight className="h-4 w-4 ml-1" />
@@ -1222,6 +1343,63 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
             </Button>
             <Button onClick={handleCreateFolder}>
               创建
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 重命名对话框 */}
+      <Dialog open={!!renamingFile} onOpenChange={(open) => {
+        if (!open) {
+          setRenamingFile(null)
+          setNewFileName('')
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重命名文件</DialogTitle>
+            <DialogDescription>
+              输入新的文件名
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-file-name" className="text-right">
+                文件名
+              </Label>
+              <Input
+                id="new-file-name"
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                className="col-span-3"
+                placeholder="输入新文件名"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmRename()
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setRenamingFile(null)
+              setNewFileName('')
+            }}>
+              取消
+            </Button>
+            <Button 
+              onClick={handleConfirmRename}
+              disabled={renameMutation.isPending}
+            >
+              {renameMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  重命名中...
+                </>
+              ) : (
+                '确认'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

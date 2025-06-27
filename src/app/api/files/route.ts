@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
         Prefix: prefix,
         Marker: marker,
         MaxKeys: maxKeys,
+        Delimiter: '/', // 添加分隔符以支持文件夹
       }, (err, data) => {
         if (err) {
           reject(err)
@@ -61,13 +62,23 @@ export async function GET(request: NextRequest) {
       })
     })
     
-    const cosFiles = cosResult.Contents.map((item: any) => ({
+    // 处理文件列表
+    const cosFiles = (cosResult.Contents || []).map((item: any) => ({
       key: item.Key,
       name: item.Key.split('/').pop() || item.Key,
       size: parseInt(item.Size),
       lastModified: new Date(item.LastModified),
       eTag: item.ETag,
       storageClass: item.StorageClass,
+    }))
+    
+    // 处理文件夹（CommonPrefixes）
+    const cosFolders = (cosResult.CommonPrefixes || []).map((item: any) => ({
+      key: item.Prefix,
+      name: item.Prefix.split('/').filter(Boolean).pop() || item.Prefix,
+      size: 0,
+      lastModified: new Date(),
+      isFolder: true
     }))
     
     // 获取数据库中的文件记录
@@ -83,18 +94,37 @@ export async function GET(request: NextRequest) {
     // 创建文件映射
     const dbFileMap = new Map(dbFiles.map(file => [file.key, file]))
     
-    // 合并COS文件和数据库记录
-    const files = cosFiles.map((cosFile: any) => {
-      const dbFile = dbFileMap.get(cosFile.key)
-      const fileUrl = getFileUrl(bucket.name, bucket.region, cosFile.key, bucket.customDomain || undefined)
+    // 合并所有项目（文件和文件夹）
+    const allItems = [...cosFolders, ...cosFiles]
+    
+    // 处理所有项目
+    const files = allItems.map((item: any) => {
+      // 如果是文件夹
+      if (item.isFolder) {
+        return {
+          id: null,
+          key: item.key,
+          name: item.name,
+          size: 0,
+          type: 'folder',
+          lastModified: item.lastModified,
+          uploadedAt: item.lastModified,
+          url: getFileUrl(bucket.name, bucket.region, item.key, bucket.customDomain || undefined),
+          thumbnailUrl: null,
+          bucketId: bucketId,
+          isFolder: true
+        }
+      }
       
-
+      // 如果是文件
+      const dbFile = dbFileMap.get(item.key)
+      const fileUrl = getFileUrl(bucket.name, bucket.region, item.key, bucket.customDomain || undefined)
       
       // 动态生成缩略图URL
       const thumbnailUrl = getThumbnailUrl(
         bucket.name,
         bucket.region,
-        cosFile.key,
+        item.key,
         bucket.customDomain || undefined,
         dbFile?.thumbnailUrl,
         dbFile?.type
@@ -102,23 +132,27 @@ export async function GET(request: NextRequest) {
       
       return {
         id: dbFile?.id || null,
-        key: cosFile.key,
-        name: cosFile.name,
-        size: cosFile.size,
+        key: item.key,
+        name: item.name,
+        size: item.size,
         type: dbFile?.type || 'application/octet-stream',
-        lastModified: cosFile.lastModified,
-        uploadedAt: dbFile?.uploadedAt || cosFile.lastModified,
+        lastModified: item.lastModified,
+        uploadedAt: dbFile?.uploadedAt || item.lastModified,
         url: fileUrl,
         thumbnailUrl: thumbnailUrl,
         bucketId: bucketId
       }
     })
     
+    // 判断是否有更多数据
+    // COS 的 IsTruncated 表示是否还有更多数据
+    const isTruncated = cosResult.IsTruncated === 'true' || cosResult.IsTruncated === true
+    
     // 返回分页信息
     return NextResponse.json({
       files,
-      nextMarker: cosResult.NextMarker || null,
-      isTruncated: cosResult.IsTruncated || false,
+      nextMarker: isTruncated ? cosResult.NextMarker : null,
+      isTruncated: isTruncated,
       total: files.length
     })
   } catch (error) {
@@ -170,10 +204,9 @@ export async function POST(request: NextRequest) {
       // 使用自定义key（例如创建文件夹）
       key = customKey
     } else {
-      // 自动生成key
-      const timestamp = Date.now()
+      // 保持原始文件名，只添加前缀路径
       const filename = file.name
-      key = prefix ? `${prefix}${timestamp}-${filename}` : `${timestamp}-${filename}`
+      key = prefix ? `${prefix}${filename}` : filename
     }
     
     // 读取文件内容

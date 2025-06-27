@@ -4,9 +4,15 @@ import { decrypt } from './utils'
 
 // 创建COS实例
 export function createCosInstance(config: CosConfig): COS {
+  // 如果密钥看起来像是加密的（包含冒号），则解密
+  let secretKey = config.secretKey
+  if (secretKey.includes(':')) {
+    secretKey = decrypt(config.secretKey)
+  }
+  
   return new COS({
     SecretId: config.secretId,
-    SecretKey: decrypt(config.secretKey), // 解密密钥
+    SecretKey: secretKey,
     Protocol: 'https:',
   })
 }
@@ -210,4 +216,19 @@ export async function checkFileExists(
       resolve(!err)
     })
   })
+}
+
+// 重命名文件（复制后删除原文件）
+export async function renameFile(
+  cos: COS,
+  bucket: string,
+  region: string,
+  oldKey: string,
+  newKey: string
+): Promise<void> {
+  // 先复制文件到新路径
+  await copyFile(cos, bucket, region, oldKey, bucket, region, newKey)
+  
+  // 然后删除原文件
+  await deleteFile(cos, bucket, region, oldKey)
 } 
