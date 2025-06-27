@@ -149,9 +149,10 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   
   // 获取文件列表
   const { data: allData = { files: [], folders: [], nextMarker: null, isTruncated: false, total: 0 }, isLoading, isFetching } = useQuery({
-    queryKey: ['files', bucketId, currentPath, markers[page - 1], pageSize, sortField, sortOrder],
-    queryFn: async () => {
-      const marker = markers[page - 1] || ''
+    queryKey: ['files', bucketId, currentPath, markers[page - 1], pageSize, sortField, sortOrder, page],
+    queryFn: async ({ queryKey }) => {
+      const currentPage = queryKey[7] as number
+      const marker = markers[currentPage - 1] || ''
       const res = await fetch(`/api/files?bucketId=${bucketId}&prefix=${currentPath}&marker=${marker}&maxKeys=${pageSize}&sortField=${sortField}&sortOrder=${sortOrder}`)
       if (!res.ok) throw new Error('Failed to fetch files')
       const data = await res.json()
@@ -175,11 +176,12 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       })
       
       // 更新分页状态
-      const hasMoreData = data.isTruncated || false
+      // 如果当前页不是最后一页（currentPage < markers.length），说明还有下一页
+      const hasMoreData = (data.isTruncated || false) || (currentPage < markers.length)
       setHasMore(hasMoreData)
       
       // 如果有下一页，预先存储下一页的marker
-      if (data.nextMarker && page === markers.length) {
+      if (data.nextMarker && currentPage === markers.length) {
         setMarkers(prev => [...prev, data.nextMarker])
       }
       
@@ -1222,7 +1224,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           variant="outline"
           size="sm"
           onClick={() => setPage(prev => Math.max(1, prev - 1))}
-          disabled={page === 1}
+          disabled={page === 1 || isFetching}
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
           上一页
@@ -1236,11 +1238,11 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
           variant="outline"
           size="sm"
           onClick={() => {
-            if (hasMore) {
+            if (hasMore || page < markers.length) {
               setPage(prev => prev + 1)
             }
           }}
-          disabled={!hasMore}
+          disabled={(!hasMore && page >= markers.length) || isFetching}
         >
           下一页
           <ChevronRight className="h-4 w-4 ml-1" />

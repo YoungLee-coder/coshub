@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
           let cosTotalSize = 0
           
           while (isTruncated) {
-            const result = await new Promise<any>((resolve, reject) => {
+            const result = await new Promise<{ Contents?: Array<{ Key: string; Size: string }>; IsTruncated: boolean | string; NextMarker?: string }>((resolve, reject) => {
               cos.getBucket({
                 Bucket: bucket.name,
                 Region: bucket.region,
@@ -66,9 +66,9 @@ export async function GET(request: NextRequest) {
               })
             })
             
-            const files = (result.Contents || []).filter((item: any) => !item.Key.endsWith('/'))
+            const files = (result.Contents || []).filter((item) => !item.Key.endsWith('/'))
             cosFileCount += files.length
-            cosTotalSize += files.reduce((sum: number, file: any) => sum + parseInt(file.Size || 0), 0)
+            cosTotalSize += files.reduce((sum: number, file) => sum + parseInt(file.Size || '0'), 0)
             
             isTruncated = result.IsTruncated === 'true' || result.IsTruncated === true
             marker = result.NextMarker || ''
