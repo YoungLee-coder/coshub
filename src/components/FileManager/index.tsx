@@ -148,7 +148,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   }, [bucketId, currentPath, pageSize])
   
   // 获取文件列表
-  const { data: allData = { files: [], folders: [], nextMarker: null, isTruncated: false }, isLoading } = useQuery({
+  const { data: allData = { files: [], folders: [], nextMarker: null, isTruncated: false }, isLoading, isFetching } = useQuery({
     queryKey: ['files', bucketId, currentPath, markers[page - 1], pageSize],
     queryFn: async () => {
       const marker = markers[page - 1] || ''
@@ -189,6 +189,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     staleTime: 5 * 60 * 1000, // 5分钟内数据视为新鲜
     gcTime: 10 * 60 * 1000, // 10分钟后垃圾回收
     refetchOnWindowFocus: false, // 窗口获得焦点时不重新获取
+    placeholderData: (previousData) => previousData, // 保留之前的数据直到新数据加载完成
   })
   
   const { files: allFiles, folders: allFolders } = allData
@@ -918,7 +919,10 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     })
   }
   
-  if (isLoading) {
+  // 判断是否是首次加载（没有数据且正在加载）
+  const isInitialLoading = isLoading && allFiles.length === 0 && allFolders.length === 0
+  
+  if (isInitialLoading) {
     return (
       <div className="space-y-4">
         {/* 面包屑导航骨架 */}
@@ -1179,93 +1183,86 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
         
         <div className="text-sm text-muted-foreground whitespace-nowrap">
           {searchFilters.query && files.length !== allFiles.length ? (
-            <>找到 {files.length} 个文件 / 共 {allFiles.length} 个</>
+            <>找到 {files.length} 个文件 / 共 {selectedBucket?.fileCount || 0} 个</>
           ) : (
-            <>
-              共 {files.length} 个文件
-              {hasMore && ` (第 ${page} 页)`}
-            </>
+            <>共 {selectedBucket?.fileCount || 0} 个文件</>
           )}
         </div>
       </div>
       
       {/* 文件列表 */}
-      {isLoading ? (
-        viewMode === 'list' ? (
-          <FileSkeleton type="list" />
+      <div className="relative">
+        {/* 加载遮罩 */}
+        {isFetching && !isInitialLoading && (
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        
+        {viewMode === 'list' ? (
+          <VirtualFileList
+            files={files}
+            folders={searchFilters.query.trim() ? [] : allFolders}
+            selectedFiles={selectedFiles}
+            onSelectFile={handleSelectFile}
+            onSelectAll={handleSelectAll}
+            onPreviewFile={handlePreview}
+            onDeleteFile={(id) => setDeleteFileId(id)}
+            onRenameFile={handleRename}
+            onNavigateToFolder={navigateToFolder}
+            onCopyLink={handleCopyLink}
+            getFilePreview={getListFilePreview}
+            formatFileSize={formatFileSize}
+            formatDate={formatDate}
+          />
         ) : (
-          <FileSkeleton type="grid" />
-        )
-      ) : viewMode === 'list' ? (
-        <VirtualFileList
-          files={files}
-          folders={searchFilters.query.trim() ? [] : allFolders}
-          selectedFiles={selectedFiles}
-          onSelectFile={handleSelectFile}
-          onSelectAll={handleSelectAll}
-          onPreviewFile={handlePreview}
-          onDeleteFile={(id) => setDeleteFileId(id)}
-          onRenameFile={handleRename}
-          onNavigateToFolder={navigateToFolder}
-          onCopyLink={handleCopyLink}
-          getFilePreview={getListFilePreview}
-          formatFileSize={formatFileSize}
-          formatDate={formatDate}
-        />
-      ) : (
-        <GridView
-          files={files}
-          folders={searchFilters.query.trim() ? [] : allFolders}
-          selectedFiles={selectedFiles}
-          onSelectFile={handleSelectFile}
-          onPreviewFile={handlePreview}
-          onDeleteFile={(id) => setDeleteFileId(id)}
-          onRenameFile={handleRename}
-          onNavigateToFolder={navigateToFolder}
-          onCopyLink={handleCopyLink}
-          getFilePreview={getFilePreview}
-          formatFileSize={formatFileSize}
-          formatDate={formatDate}
-        />
-      )}
+          <GridView
+            files={files}
+            folders={searchFilters.query.trim() ? [] : allFolders}
+            selectedFiles={selectedFiles}
+            onSelectFile={handleSelectFile}
+            onPreviewFile={handlePreview}
+            onDeleteFile={(id) => setDeleteFileId(id)}
+            onRenameFile={handleRename}
+            onNavigateToFolder={navigateToFolder}
+            onCopyLink={handleCopyLink}
+            getFilePreview={getFilePreview}
+            formatFileSize={formatFileSize}
+            formatDate={formatDate}
+          />
+        )}
+      </div>
       
       {/* 分页控件 */}
-      {(hasMore || page > 1) && (
-        <div className="flex items-center justify-center gap-4 mt-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (page > 1) {
-                setPage(prev => prev - 1)
-              }
-            }}
-            disabled={page === 1}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            上一页
-          </Button>
-          
-          <div className="text-sm text-muted-foreground">
-            第 {page} 页
-            {!hasMore && page > 1 && ` (最后一页)`}
-          </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (hasMore && markers[page]) {
-                setPage(prev => prev + 1)
-              }
-            }}
-            disabled={!hasMore || !markers[page]}
-          >
-            下一页
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
+      <div className="flex items-center justify-center gap-4 mt-6 pb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage(prev => Math.max(1, prev - 1))}
+          disabled={page === 1}
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          上一页
+        </Button>
+        
+        <div className="text-sm text-muted-foreground">
+          第 {page} 页
         </div>
-      )}
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (hasMore) {
+              setPage(prev => prev + 1)
+            }
+          }}
+          disabled={!hasMore}
+        >
+          下一页
+          <ChevronRight className="h-4 w-4 ml-1" />
+        </Button>
+      </div>
       
       {/* 删除确认对话框 */}
       <AlertDialog open={!!deleteFileId} onOpenChange={() => setDeleteFileId(null)}>

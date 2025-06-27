@@ -26,7 +26,12 @@ export async function GET(request: NextRequest) {
     
     // 获取存储桶信息
     const bucket = await prisma.bucket.findUnique({
-      where: { id: bucketId }
+      where: { id: bucketId },
+      include: {
+        _count: {
+          select: { files: true }
+        }
+      }
     })
     
     if (!bucket) {
@@ -153,7 +158,7 @@ export async function GET(request: NextRequest) {
       files,
       nextMarker: isTruncated ? cosResult.NextMarker : null,
       isTruncated: isTruncated,
-      total: files.length
+      total: bucket?._count.files || 0
     })
   } catch (error) {
     console.error('Failed to list files:', error)
