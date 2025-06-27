@@ -4,9 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { encrypt } from '@/lib/utils'
 import { BucketFormData } from '@/types'
+import { createCosInstance } from '@/lib/cos'
 
 // 获取存储桶列表
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   
   if (!session) {
@@ -14,6 +15,9 @@ export async function GET() {
   }
   
   try {
+    const searchParams = request.nextUrl.searchParams
+    const includeStats = searchParams.get('includeStats') === 'true'
+    
     const buckets = await prisma.bucket.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -23,12 +27,69 @@ export async function GET() {
       }
     })
     
-    // 构建响应数据，使用数据库中的文件数量
-    const bucketsWithStats = buckets.map(bucket => ({
-      ...bucket,
-      secretKey: undefined, // 不返回密钥
-      fileCount: bucket._count.files,
-      totalSize: 0 // 暂时不计算总大小，可以后续优化
+    // 构建响应数据
+    const bucketsWithStats = await Promise.all(buckets.map(async (bucket) => {
+      let fileCount = bucket._count.files
+      let totalSize = 0
+      
+      // 只有在需要详细统计时才查询COS
+      if (includeStats) {
+        try {
+          // 创建COS实例
+          const cos = createCosInstance({
+            secretId: bucket.secretId,
+            secretKey: bucket.secretKey,
+            region: bucket.region,
+            bucket: bucket.name,
+            customDomain: bucket.customDomain || undefined
+          })
+          
+          // 获取存储桶中的所有文件统计
+          let marker = ''
+          let isTruncated = true
+          let cosFileCount = 0
+          let cosTotalSize = 0
+          
+          while (isTruncated) {
+            const result = await new Promise<any>((resolve, reject) => {
+              cos.getBucket({
+                Bucket: bucket.name,
+                Region: bucket.region,
+                Marker: marker,
+                MaxKeys: 1000,
+              }, (err, data) => {
+                if (err) {
+                  reject(err)
+                  return
+                }
+                resolve(data)
+              })
+            })
+            
+            const files = (result.Contents || []).filter((item: any) => !item.Key.endsWith('/'))
+            cosFileCount += files.length
+            cosTotalSize += files.reduce((sum: number, file: any) => sum + parseInt(file.Size || 0), 0)
+            
+            isTruncated = result.IsTruncated === 'true' || result.IsTruncated === true
+            marker = result.NextMarker || ''
+            
+            if (!isTruncated) break
+          }
+          
+          fileCount = cosFileCount
+          totalSize = cosTotalSize
+        } catch (error) {
+          console.error(`Failed to get stats for bucket ${bucket.name}:`, error)
+          // 如果获取失败，使用数据库中的值
+        }
+      }
+      
+      return {
+        ...bucket,
+        secretKey: undefined, // 不返回密钥
+        fileCount,
+        totalSize
+      }
     }))
     
     return NextResponse.json(bucketsWithStats)

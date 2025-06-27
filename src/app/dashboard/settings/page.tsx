@@ -39,10 +39,10 @@ export default function SettingsPage() {
   // 添加折叠状态
   const [isAccountExpanded, setIsAccountExpanded] = useState(false)
   
-  const { data: buckets, isLoading: bucketsLoading } = useQuery({
+  const { data: buckets = [], isLoading: bucketsLoading } = useQuery({
     queryKey: ['buckets'],
     queryFn: async () => {
-      const res = await fetch('/api/buckets')
+      const res = await fetch('/api/buckets?includeStats=true')
       if (!res.ok) throw new Error('Failed to fetch buckets')
       return res.json()
     },

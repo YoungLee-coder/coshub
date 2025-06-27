@@ -145,14 +145,14 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
     setPage(1)
     setHasMore(false)
     setMarkers([''])
-  }, [bucketId, currentPath, pageSize])
+  }, [bucketId, currentPath, pageSize, sortField, sortOrder])
   
   // 获取文件列表
-  const { data: allData = { files: [], folders: [], nextMarker: null, isTruncated: false }, isLoading, isFetching } = useQuery({
-    queryKey: ['files', bucketId, currentPath, markers[page - 1], pageSize],
+  const { data: allData = { files: [], folders: [], nextMarker: null, isTruncated: false, total: 0 }, isLoading, isFetching } = useQuery({
+    queryKey: ['files', bucketId, currentPath, markers[page - 1], pageSize, sortField, sortOrder],
     queryFn: async () => {
       const marker = markers[page - 1] || ''
-      const res = await fetch(`/api/files?bucketId=${bucketId}&prefix=${currentPath}&marker=${marker}&maxKeys=${pageSize}`)
+      const res = await fetch(`/api/files?bucketId=${bucketId}&prefix=${currentPath}&marker=${marker}&maxKeys=${pageSize}&sortField=${sortField}&sortOrder=${sortOrder}`)
       if (!res.ok) throw new Error('Failed to fetch files')
       const data = await res.json()
       
@@ -160,7 +160,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       const files: FileWithUrl[] = []
       const folders: FolderItem[] = []
       
-      // API 返回格式是 { files: [], nextMarker: null, isTruncated: false }
+      // API 返回格式是 { files: [], nextMarker: null, isTruncated: false, total: 0 }
       const responseData = data.files || []
       responseData.forEach((item: ExtendedFileWithUrl) => {
         // 检查是否是文件夹
@@ -183,7 +183,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
         setMarkers(prev => [...prev, data.nextMarker])
       }
       
-      return { files, folders, nextMarker: data.nextMarker, isTruncated: data.isTruncated }
+      return { files, folders, nextMarker: data.nextMarker, isTruncated: data.isTruncated, total: data.total || 0 }
     },
     // 缓存优化
     staleTime: 5 * 60 * 1000, // 5分钟内数据视为新鲜
@@ -193,6 +193,7 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
   })
   
   const { files: allFiles, folders: allFolders } = allData
+  const totalFileCount = allData.total || 0
   
   // 过滤和排序文件
   const files = useMemo(() => {
@@ -263,27 +264,9 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
       })
     }
     
-    // 排序
-    const sorted = [...filtered].sort((a, b) => {
-      let comparison = 0
-      
-      switch (sortField) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name, 'zh-CN')
-          break
-        case 'size':
-          comparison = a.size - b.size
-          break
-        case 'uploadedAt':
-          comparison = new Date(a.uploadedAt || 0).getTime() - new Date(b.uploadedAt || 0).getTime()
-          break
-      }
-      
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
-    
-    return sorted
-  }, [allFiles, searchFilters, sortField, sortOrder])
+    // 不在前端排序，因为已经在后端排序了
+    return filtered
+  }, [allFiles, searchFilters])
   
   // 删除文件
   const deleteMutation = useMutation({
@@ -1183,9 +1166,9 @@ export function FileManager({ bucketId, prefix = '' }: FileManagerProps) {
         
         <div className="text-sm text-muted-foreground whitespace-nowrap">
           {searchFilters.query && files.length !== allFiles.length ? (
-            <>找到 {files.length} 个文件 / 共 {selectedBucket?.fileCount || 0} 个</>
+            <>找到 {files.length} 个文件 / 共 {totalFileCount} 个</>
           ) : (
-            <>共 {selectedBucket?.fileCount || 0} 个文件</>
+            <>共 {totalFileCount} 个文件</>
           )}
         </div>
       </div>

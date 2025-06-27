@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
     const prefix = searchParams.get('prefix') || ''
     const marker = searchParams.get('marker') || ''
     const maxKeys = parseInt(searchParams.get('maxKeys') || '1000')
+    const sortField = searchParams.get('sortField') || 'uploadedAt'
+    const sortOrder = searchParams.get('sortOrder') || 'desc'
     
     if (!bucketId) {
       return NextResponse.json({ error: '请提供bucketId' }, { status: 400 })
@@ -38,8 +40,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '存储桶不存在' }, { status: 404 })
     }
     
-
-    
     // 创建COS实例
     const cos = createCosInstance({
       secretId: bucket.secretId,
@@ -49,33 +49,142 @@ export async function GET(request: NextRequest) {
       customDomain: bucket.customDomain || undefined
     })
     
-    // 获取COS文件列表（支持分页）
-    const cosResult = await new Promise<any>((resolve, reject) => {
-      cos.getBucket({
-        Bucket: bucket.name,
-        Region: bucket.region,
-        Prefix: prefix,
-        Marker: marker,
-        MaxKeys: maxKeys,
-        Delimiter: '/', // 添加分隔符以支持文件夹
-      }, (err, data) => {
-        if (err) {
-          reject(err)
-          return
-        }
-        resolve(data)
-      })
-    })
+    // 如果需要获取总文件数或进行排序，先获取所有文件
+    let totalFileCount = 0
+    let allCosFiles: any[] = []
     
-    // 处理文件列表
-    const cosFiles = (cosResult.Contents || []).map((item: any) => ({
-      key: item.Key,
-      name: item.Key.split('/').pop() || item.Key,
-      size: parseInt(item.Size),
-      lastModified: new Date(item.LastModified),
-      eTag: item.ETag,
-      storageClass: item.StorageClass,
-    }))
+    if (sortField !== 'name' || marker === '') {
+      // 获取所有文件用于统计和排序
+      let tempMarker = ''
+      let isTruncated = true
+      
+      while (isTruncated) {
+        const tempResult = await new Promise<any>((resolve, reject) => {
+          cos.getBucket({
+            Bucket: bucket.name,
+            Region: bucket.region,
+            Prefix: prefix,
+            Marker: tempMarker,
+            MaxKeys: 1000,
+            Delimiter: '/',
+          }, (err, data) => {
+            if (err) {
+              reject(err)
+              return
+            }
+            resolve(data)
+          })
+        })
+        
+        const tempFiles = (tempResult.Contents || []).filter((item: any) => !item.Key.endsWith('/'))
+        allCosFiles = allCosFiles.concat(tempFiles)
+        
+        isTruncated = tempResult.IsTruncated === 'true' || tempResult.IsTruncated === true
+        tempMarker = tempResult.NextMarker || ''
+        
+        if (!isTruncated) break
+      }
+      
+      totalFileCount = allCosFiles.length
+    }
+    
+    // 获取当前页的文件列表
+    let cosResult: any
+    let cosFiles: any[]
+    
+    if (sortField === 'name' && marker !== '') {
+      // 如果是按名称排序且不是第一页，使用普通分页
+      cosResult = await new Promise<any>((resolve, reject) => {
+        cos.getBucket({
+          Bucket: bucket.name,
+          Region: bucket.region,
+          Prefix: prefix,
+          Marker: marker,
+          MaxKeys: maxKeys,
+          Delimiter: '/',
+        }, (err, data) => {
+          if (err) {
+            reject(err)
+            return
+          }
+          resolve(data)
+        })
+      })
+      
+      cosFiles = (cosResult.Contents || []).map((item: any) => ({
+        key: item.Key,
+        name: item.Key.split('/').pop() || item.Key,
+        size: parseInt(item.Size),
+        lastModified: new Date(item.LastModified),
+        eTag: item.ETag,
+        storageClass: item.StorageClass,
+      }))
+    } else {
+      // 需要排序的情况，从已获取的所有文件中处理
+      if (sortField === 'uploadedAt' || sortField === 'size') {
+        // 排序所有文件
+        allCosFiles.sort((a, b) => {
+          if (sortField === 'uploadedAt') {
+            const dateA = new Date(a.LastModified).getTime()
+            const dateB = new Date(b.LastModified).getTime()
+            return sortOrder === 'desc' ? dateB - dateA : dateA - dateB
+          } else if (sortField === 'size') {
+            const sizeA = parseInt(a.Size)
+            const sizeB = parseInt(b.Size)
+            return sortOrder === 'desc' ? sizeB - sizeA : sizeA - sizeB
+          }
+          return 0
+        })
+        
+        // 计算当前页的起始位置
+        const pageIndex = marker ? allCosFiles.findIndex(f => f.Key === marker) + 1 : 0
+        const pageFiles = allCosFiles.slice(pageIndex, pageIndex + maxKeys)
+        
+        cosFiles = pageFiles.map((item: any) => ({
+          key: item.Key,
+          name: item.Key.split('/').pop() || item.Key,
+          size: parseInt(item.Size),
+          lastModified: new Date(item.LastModified),
+          eTag: item.ETag,
+          storageClass: item.StorageClass,
+        }))
+        
+        // 构造分页信息
+        cosResult = {
+          IsTruncated: pageIndex + maxKeys < allCosFiles.length,
+          NextMarker: pageIndex + maxKeys < allCosFiles.length ? allCosFiles[pageIndex + maxKeys - 1].Key : null,
+          Contents: pageFiles,
+          CommonPrefixes: []
+        }
+      } else {
+        // 按名称排序，第一页
+        cosResult = await new Promise<any>((resolve, reject) => {
+          cos.getBucket({
+            Bucket: bucket.name,
+            Region: bucket.region,
+            Prefix: prefix,
+            Marker: marker,
+            MaxKeys: maxKeys,
+            Delimiter: '/',
+          }, (err, data) => {
+            if (err) {
+              reject(err)
+              return
+            }
+            resolve(data)
+          })
+        })
+        
+        cosFiles = (cosResult.Contents || []).map((item: any) => ({
+          key: item.Key,
+          name: item.Key.split('/').pop() || item.Key,
+          size: parseInt(item.Size),
+          lastModified: new Date(item.LastModified),
+          eTag: item.ETag,
+          storageClass: item.StorageClass,
+        }))
+      }
+    }
     
     // 处理文件夹（CommonPrefixes）
     const cosFolders = (cosResult.CommonPrefixes || []).map((item: any) => ({
@@ -158,7 +267,7 @@ export async function GET(request: NextRequest) {
       files,
       nextMarker: isTruncated ? cosResult.NextMarker : null,
       isTruncated: isTruncated,
-      total: bucket?._count.files || 0
+      total: totalFileCount > 0 ? totalFileCount : bucket?._count.files || 0
     })
   } catch (error) {
     console.error('Failed to list files:', error)
